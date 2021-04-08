@@ -223,6 +223,8 @@ type Options struct {
 	ChunkSize                   fs.SizeSuffix        `config:"chunk_size"`
 	NoChunk                     bool                 `config:"no_chunk"`
 	Enc                         encoder.MultiEncoder `config:"encoding"`
+	FetchUntilEmptyPage         bool                 `config:"fetch_until_empty_page"`
+	PartialPageFetchThreshold   int                  `config:"partial_page_fetch_threshold"`
 }
 
 // Fs represents a remote swift server
@@ -377,6 +379,8 @@ func swiftConnection(ctx context.Context, opt *Options, name string) (*swift.Con
 		ConnectTimeout:              10 * ci.ConnectTimeout, // Use the timeouts in the transport
 		Timeout:                     10 * ci.Timeout,        // Use the timeouts in the transport
 		Transport:                   fshttp.NewTransport(ctx),
+		FetchUntilEmptyPage:         opt.FetchUntilEmptyPage,
+		PartialPageFetchThreshold:   opt.PartialPageFetchThreshold,
 	}
 	if opt.EnvAuth {
 		err := c.ApplyEnvironment()

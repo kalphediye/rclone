@@ -46,7 +46,7 @@ type marchTester struct {
 }
 
 // DstOnly have an object which is in the destination only
-func (mt *marchTester) DstOnly(dst fs.DirEntry) (recurse bool) {
+func (mt *marchTester) DstOnly(ctx context.Context, dst fs.DirEntry) (recurse bool) {
 	mt.entryMutex.Lock()
 	mt.dstOnly = append(mt.dstOnly, dst)
 	mt.entryMutex.Unlock()
@@ -62,7 +62,7 @@ func (mt *marchTester) DstOnly(dst fs.DirEntry) (recurse bool) {
 }
 
 // SrcOnly have an object which is in the source only
-func (mt *marchTester) SrcOnly(src fs.DirEntry) (recurse bool) {
+func (mt *marchTester) SrcOnly(ctx context.Context, src fs.DirEntry) (recurse bool) {
 	mt.entryMutex.Lock()
 	mt.srcOnly = append(mt.srcOnly, src)
 	mt.entryMutex.Unlock()

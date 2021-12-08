@@ -40,9 +40,9 @@ type March struct {
 // Marcher is called on each match
 type Marcher interface {
 	// SrcOnly is called for a DirEntry found only in the source
-	SrcOnly(src fs.DirEntry) (recurse bool)
+	SrcOnly(ctx context.Context, src fs.DirEntry) (recurse bool)
 	// DstOnly is called for a DirEntry found only in the destination
-	DstOnly(dst fs.DirEntry) (recurse bool)
+	DstOnly(ctx context.Context, dst fs.DirEntry) (recurse bool)
 	// Match is called for a DirEntry found both in the source and destination
 	Match(ctx context.Context, dst, src fs.DirEntry) (recurse bool)
 }
@@ -412,7 +412,7 @@ func (m *March) processJob(job listDirJob) ([]listDirJob, error) {
 		} else {
 			fs.Errorf(m.Fsrc, "error reading source root directory: %v", srcListErr)
 		}
-		srcListErr = fs.CountError(srcListErr)
+		srcListErr = fs.CountError(m.Ctx, srcListErr)
 		return nil, srcListErr
 	}
 	if dstListErr == fs.ErrorDirNotFound {
@@ -423,7 +423,7 @@ func (m *March) processJob(job listDirJob) ([]listDirJob, error) {
 		} else {
 			fs.Errorf(m.Fdst, "error reading destination root directory: %v", dstListErr)
 		}
-		dstListErr = fs.CountError(dstListErr)
+		dstListErr = fs.CountError(m.Ctx, dstListErr)
 		return nil, dstListErr
 	}
 
@@ -458,7 +458,7 @@ func (m *March) processJob(job listDirJob) ([]listDirJob, error) {
 		if m.aborting() {
 			return nil, m.Ctx.Err()
 		}
-		recurse := m.Callback.SrcOnly(src)
+		recurse := m.Callback.SrcOnly(m.Ctx, src)
 		if recurse && job.srcDepth > 0 {
 			jobs = append(jobs, listDirJob{
 				srcRemote: src.Remote(),
@@ -473,7 +473,7 @@ func (m *March) processJob(job listDirJob) ([]listDirJob, error) {
 		if m.aborting() {
 			return nil, m.Ctx.Err()
 		}
-		recurse := m.Callback.DstOnly(dst)
+		recurse := m.Callback.DstOnly(m.Ctx, dst)
 		if recurse && job.dstDepth > 0 {
 			jobs = append(jobs, listDirJob{
 				srcRemote: dst.Remote(),

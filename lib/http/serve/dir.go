@@ -2,6 +2,7 @@ package serve
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -125,7 +126,7 @@ func (d *Directory) AddEntry(remote string, isDir bool) {
 
 // Error logs the error and if a ResponseWriter is given it writes an http.StatusInternalServerError
 func Error(what interface{}, w http.ResponseWriter, text string, err error) {
-	err = fs.CountError(err)
+	err = fs.CountError(context.Background(), err)
 	fs.Errorf(what, "%s: %v", text, err)
 	if w != nil {
 		http.Error(w, text+".", http.StatusInternalServerError)

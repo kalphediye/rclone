@@ -510,7 +510,7 @@ func TestSyncIgnoreErrors(t *testing.T) {
 	)
 
 	accounting.GlobalStats().ResetCounters()
-	_ = fs.CountError(errors.New("boom"))
+	_ = fs.CountError(ctx, errors.New("boom"))
 	assert.NoError(t, Sync(ctx, r.Fremote, r.Flocal, false))
 
 	r.CheckLocalListing(
@@ -819,7 +819,7 @@ func TestSyncAfterRemovingAFileAndAddingAFileSubDirWithErrors(t *testing.T) {
 	)
 
 	accounting.GlobalStats().ResetCounters()
-	_ = fs.CountError(errors.New("boom"))
+	_ = fs.CountError(ctx, errors.New("boom"))
 	err := Sync(ctx, r.Fremote, r.Flocal, false)
 	assert.Equal(t, fs.ErrorNotDeleting, err)
 

@@ -1,6 +1,7 @@
 package dlna
 
 import (
+	"context"
 	"crypto/md5"
 	"encoding/xml"
 	"errors"
@@ -214,7 +215,7 @@ func withHeader(name string, value string, next http.Handler) http.Handler {
 
 // serveError returns an http.StatusInternalServerError and logs the error
 func serveError(what interface{}, w http.ResponseWriter, text string, err error) {
-	err = fs.CountError(err)
+	err = fs.CountError(context.Background(), err)
 	fs.Errorf(what, "%s: %v", text, err)
 	http.Error(w, text+".", http.StatusInternalServerError)
 }

@@ -325,7 +325,7 @@ func (s *syncCopyMove) pairChecker(in *pipe, out *pipe, fraction int, wg *sync.W
 			if !NoNeedTransfer && operations.NeedTransfer(s.ctx, pair.Dst, pair.Src) {
 				// If files are treated as immutable, fail if destination exists and does not match
 				if s.ci.Immutable && pair.Dst != nil {
-					err := fs.CountError(fserrors.NoRetryError(fs.ErrorImmutableModified))
+					err := fs.CountError(s.ctx, fserrors.NoRetryError(fs.ErrorImmutableModified))
 					fs.Errorf(pair.Dst, "Source and destination exist but do not match: %v", err)
 					s.processError(err)
 				} else {
@@ -924,7 +924,7 @@ func (s *syncCopyMove) run() error {
 }
 
 // DstOnly have an object which is in the destination only
-func (s *syncCopyMove) DstOnly(dst fs.DirEntry) (recurse bool) {
+func (s *syncCopyMove) DstOnly(ctx context.Context, dst fs.DirEntry) (recurse bool) {
 	if s.deleteMode == fs.DeleteModeOff {
 		return false
 	}
@@ -962,7 +962,7 @@ func (s *syncCopyMove) DstOnly(dst fs.DirEntry) (recurse bool) {
 }
 
 // SrcOnly have an object which is in the source only
-func (s *syncCopyMove) SrcOnly(src fs.DirEntry) (recurse bool) {
+func (s *syncCopyMove) SrcOnly(ctx context.Context, src fs.DirEntry) (recurse bool) {
 	if s.deleteMode == fs.DeleteModeOnly {
 		return false
 	}
@@ -1132,7 +1132,7 @@ func MoveDir(ctx context.Context, fdst, fsrc fs.Fs, deleteEmptySrcDirs bool, cop
 			fs.Infof(fdst, "Server side directory move succeeded")
 			return nil
 		default:
-			err = fs.CountError(err)
+			err = fs.CountError(ctx, err)
 			fs.Errorf(fdst, "Server side directory move failed: %v", err)
 			return err
 		}

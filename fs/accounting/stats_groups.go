@@ -18,7 +18,9 @@ func init() {
 	groups = newStatsGroups()
 
 	// Set the function pointer up in fs
-	fs.CountError = GlobalStats().Error
+	fs.CountError = func(ctx context.Context, err error) error {
+		return Stats(ctx).Error(err)
+	}
 }
 
 func rcListStats(ctx context.Context, in rc.Params) (rc.Params, error) {

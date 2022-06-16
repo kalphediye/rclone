@@ -74,7 +74,7 @@ func (c *checkMarch) reportFilename(filename string, out io.Writer, sigil rune) 
 }
 
 // DstOnly have an object which is in the destination only
-func (c *checkMarch) DstOnly(dst fs.DirEntry) (recurse bool) {
+func (c *checkMarch) DstOnly(ctx context.Context, dst fs.DirEntry) (recurse bool) {
 	switch dst.(type) {
 	case fs.Object:
 		if c.opt.OneWay {
@@ -82,7 +82,7 @@ func (c *checkMarch) DstOnly(dst fs.DirEntry) (recurse bool) {
 		}
 		err := fmt.Errorf("File not in %v", c.opt.Fsrc)
 		fs.Errorf(dst, "%v", err)
-		_ = fs.CountError(err)
+		_ = fs.CountError(ctx, err)
 		atomic.AddInt32(&c.differences, 1)
 		atomic.AddInt32(&c.srcFilesMissing, 1)
 		c.report(dst, c.opt.MissingOnSrc, '-')
@@ -99,12 +99,12 @@ func (c *checkMarch) DstOnly(dst fs.DirEntry) (recurse bool) {
 }
 
 // SrcOnly have an object which is in the source only
-func (c *checkMarch) SrcOnly(src fs.DirEntry) (recurse bool) {
+func (c *checkMarch) SrcOnly(ctx context.Context, src fs.DirEntry) (recurse bool) {
 	switch src.(type) {
 	case fs.Object:
 		err := fmt.Errorf("File not in %v", c.opt.Fdst)
 		fs.Errorf(src, "%v", err)
-		_ = fs.CountError(err)
+		_ = fs.CountError(ctx, err)
 		atomic.AddInt32(&c.differences, 1)
 		atomic.AddInt32(&c.dstFilesMissing, 1)
 		c.report(src, c.opt.MissingOnDst, '+')
@@ -154,13 +154,13 @@ func (c *checkMarch) Match(ctx context.Context, dst, src fs.DirEntry) (recurse b
 				differ, noHash, err := c.checkIdentical(ctx, dstX, srcX)
 				if err != nil {
 					fs.Errorf(src, "%v", err)
-					_ = fs.CountError(err)
+					_ = fs.CountError(ctx, err)
 					c.report(src, c.opt.Error, '!')
 				} else if differ {
 					atomic.AddInt32(&c.differences, 1)
 					err := errors.New("files differ")
 					// the checkFn has already logged the reason
-					_ = fs.CountError(err)
+					_ = fs.CountError(ctx, err)
 					c.report(src, c.opt.Differ, '*')
 				} else {
 					atomic.AddInt32(&c.matches, 1)
@@ -176,7 +176,7 @@ func (c *checkMarch) Match(ctx context.Context, dst, src fs.DirEntry) (recurse b
 		} else {
 			err := fmt.Errorf("is file on %v but directory on %v", c.opt.Fsrc, c.opt.Fdst)
 			fs.Errorf(src, "%v", err)
-			_ = fs.CountError(err)
+			_ = fs.CountError(ctx, err)
 			atomic.AddInt32(&c.differences, 1)
 			atomic.AddInt32(&c.dstFilesMissing, 1)
 			c.report(src, c.opt.MissingOnDst, '+')
@@ -189,7 +189,7 @@ func (c *checkMarch) Match(ctx context.Context, dst, src fs.DirEntry) (recurse b
 		}
 		err := fmt.Errorf("is file on %v but directory on %v", c.opt.Fdst, c.opt.Fsrc)
 		fs.Errorf(dst, "%v", err)
-		_ = fs.CountError(err)
+		_ = fs.CountError(ctx, err)
 		atomic.AddInt32(&c.differences, 1)
 		atomic.AddInt32(&c.srcFilesMissing, 1)
 		c.report(dst, c.opt.MissingOnSrc, '-')
@@ -424,7 +424,7 @@ func CheckSum(ctx context.Context, fsrc, fsum fs.Fs, sumFile string, hashType ha
 		// filesystem missed the file, sum wasn't consumed
 		err := fmt.Errorf("File not in %v", opt.Fdst)
 		fs.Errorf(filename, "%v", err)
-		_ = fs.CountError(err)
+		_ = fs.CountError(ctx, err)
 		if lastErr == nil {
 			lastErr = err
 		}
@@ -453,7 +453,7 @@ func (c *checkMarch) checkSum(ctx context.Context, obj fs.Object, download bool,
 
 	if !sumFound {
 		err = errors.New("sum not found")
-		_ = fs.CountError(err)
+		_ = fs.CountError(ctx, err)
 		fs.Errorf(obj, "%v", err)
 		atomic.AddInt32(&c.differences, 1)
 		atomic.AddInt32(&c.srcFilesMissing, 1)
@@ -502,12 +502,12 @@ func (c *checkMarch) checkSum(ctx context.Context, obj fs.Object, download bool,
 func (c *checkMarch) matchSum(ctx context.Context, sumHash, objHash string, obj fs.Object, err error, hashType hash.Type) {
 	switch {
 	case err != nil:
-		_ = fs.CountError(err)
+		_ = fs.CountError(ctx, err)
 		fs.Errorf(obj, "Failed to calculate hash: %v", err)
 		c.report(obj, c.opt.Error, '!')
 	case sumHash == "":
 		err = errors.New("duplicate file")
-		_ = fs.CountError(err)
+		_ = fs.CountError(ctx, err)
 		fs.Errorf(obj, "%v", err)
 		c.report(obj, c.opt.Error, '!')
 	case objHash == "":
@@ -522,7 +522,7 @@ func (c *checkMarch) matchSum(ctx context.Context, sumHash, objHash string, obj 
 		c.report(obj, c.opt.Match, '=')
 	default:
 		err = errors.New("files differ")
-		_ = fs.CountError(err)
+		_ = fs.CountError(ctx, err)
 		fs.Debugf(nil, "%v = %s (sum)", hashType, sumHash)
 		fs.Debugf(obj, "%v = %s (%v)", hashType, objHash, c.opt.Fdst)
 		fs.Errorf(obj, "%v", err)

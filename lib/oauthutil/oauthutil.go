@@ -75,7 +75,7 @@ All done. Please go back to rclone.
 `
 )
 
-// Define a configuration structure that we will use to store the OAuth configuration
+// Config - structure that we will use to store the OAuth configuration
 // settings. This is based on the union of the configuration structures for the two
 // OAuth modules that we are using (oauth2 and oauth2.clientcrentials), along with a
 // flag indicating if we are going to use the client credential flow

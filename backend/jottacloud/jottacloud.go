@@ -237,8 +237,8 @@ machines.`)
 		m.Set(configTokenURL, teliaCloudTokenURL)
 		return oauthutil.ConfigOut("choose_device", &oauthutil.Options{
 			OAuth2Config: &oauthutil.Config{
-				AuthURL:  teliaCloudAuthURL,
-				TokenURL: teliaCloudTokenURL,
+				AuthURL:     teliaCloudAuthURL,
+				TokenURL:    teliaCloudTokenURL,
 				ClientID:    teliaCloudClientID,
 				Scopes:      []string{"openid", "jotta-default", "offline_access"},
 				RedirectURL: oauthutil.RedirectLocalhostURL,
@@ -250,8 +250,8 @@ machines.`)
 		m.Set(configTokenURL, tele2CloudTokenURL)
 		return oauthutil.ConfigOut("choose_device", &oauthutil.Options{
 			OAuth2Config: &oauthutil.Config{
-				AuthURL:  tele2CloudAuthURL,
-				TokenURL: tele2CloudTokenURL,
+				AuthURL:     tele2CloudAuthURL,
+				TokenURL:    tele2CloudTokenURL,
 				ClientID:    tele2CloudClientID,
 				Scopes:      []string{"openid", "jotta-default", "offline_access"},
 				RedirectURL: oauthutil.RedirectLocalhostURL,

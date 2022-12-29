@@ -41,9 +41,9 @@ const (
 var (
 	// Description of how to auth for this app
 	putioConfig = &oauthutil.Config{
-		Scopes: []string{},
-		AuthURL:  "https://api.put.io/v2/oauth2/authenticate",
-		TokenURL: "https://api.put.io/v2/oauth2/access_token",
+		Scopes:       []string{},
+		AuthURL:      "https://api.put.io/v2/oauth2/authenticate",
+		TokenURL:     "https://api.put.io/v2/oauth2/access_token",
 		ClientID:     rcloneClientID,
 		ClientSecret: obscure.MustReveal(rcloneObscuredClientSecret),
 		RedirectURL:  oauthutil.RedirectLocalhostURL,

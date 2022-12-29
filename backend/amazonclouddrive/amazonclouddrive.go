@@ -50,9 +50,9 @@ const (
 var (
 	// Description of how to auth for this app
 	acdConfig = &oauthutil.Config{
-		Scopes: []string{"clouddrive:read_all", "clouddrive:write"},
-		AuthURL: "https://www.amazon.com/ap/oa",
-		TokenURL: "https://api.amazon.com/auth/o2/token",
+		Scopes:       []string{"clouddrive:read_all", "clouddrive:write"},
+		AuthURL:      "https://www.amazon.com/ap/oa",
+		TokenURL:     "https://api.amazon.com/auth/o2/token",
 		ClientID:     "",
 		ClientSecret: "",
 		RedirectURL:  oauthutil.RedirectURL,

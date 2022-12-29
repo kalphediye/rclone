@@ -116,9 +116,9 @@ const (
 // Generate a new oauth2 config which we will update when we know the TokenURL
 func newOauthConfig(tokenURL string) *oauthutil.Config {
 	return &oauthutil.Config{
-		Scopes: nil,
-		AuthURL:  "https://secure.sharefile.com/oauth/authorize",
-		TokenURL: tokenURL,
+		Scopes:       nil,
+		AuthURL:      "https://secure.sharefile.com/oauth/authorize",
+		TokenURL:     tokenURL,
 		ClientID:     rcloneClientID,
 		ClientSecret: obscure.MustReveal(rcloneEncryptedClientSecret),
 		RedirectURL:  oauthutil.RedirectPublicSecureURL,

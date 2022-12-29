@@ -83,7 +83,7 @@ var (
 	driveConfig = &oauthutil.Config{
 		Scopes:       []string{scopePrefix + "drive"},
 		AuthURL:      google.Endpoint.AuthURL,
-		TokenURL:	  google.Endpoint.TokenURL,
+		TokenURL:     google.Endpoint.TokenURL,
 		ClientID:     rcloneClientID,
 		ClientSecret: obscure.MustReveal(rcloneEncryptedClientSecret),
 		RedirectURL:  oauthutil.RedirectURL,

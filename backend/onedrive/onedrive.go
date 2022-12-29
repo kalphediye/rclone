@@ -61,7 +61,7 @@ const (
 
 // Globals
 var (
-	
+
 	// Define the paths used for token operations
 	authPath  = "/common/oauth2/v2.0/authorize"
 	tokenPath = "/common/oauth2/v2.0/token"
@@ -71,7 +71,7 @@ var (
 
 	// When using client credential OAuth flow, scope of .default is required in order
 	// to use the permissions configured for the application within the tenant
-	scopeAccessClientCred	= fs.SpaceSepList{".default"}
+	scopeAccessClientCred = fs.SpaceSepList{".default"}
 
 	// Description of how to auth for this app for a business account.
 	// This uses the configuration structure from the OAuth utils package
@@ -443,6 +443,13 @@ func Config(ctx context.Context, name string, m configmap.Mapper, config fs.Conf
 		}
 		oauthConfig.TokenURL = authEndpoint[region] + tokenPath
 		oauthConfig.AuthURL = authEndpoint[region] + authPath
+
+		// Check to see if we are using client credential flow
+		clientCredentialFlow, _ := m.Get("client_credential")
+		if clientCredentialFlow == "true" {
+			oauthConfig.Scopes = scopeAccessClientCred
+		}
+
 		return oauthutil.ConfigOut("choose_type", &oauthutil.Options{
 			OAuth2Config: oauthConfig,
 		})
@@ -878,8 +885,6 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 		return nil, fmt.Errorf("failed to configure OneDrive: %w", err)
 	}
 
-	
-	 
 	ci := fs.GetConfig(ctx)
 	f := &Fs{
 		name:      name,
@@ -910,7 +915,6 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 		_, _, err := f.readMetaDataForPath(ctx, "")
 		return err
 	})
-
 
 	// Get rootID
 	var rootID = opt.RootFolderID

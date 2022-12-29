@@ -47,7 +47,7 @@ const (
 var (
 	// Description of how to auth for this app
 	oauthConfig = &oauthutil.Config{
-		Scopes: nil,
+		Scopes:  nil,
 		AuthURL: "https://my.pcloud.com/oauth2/authorize",
 		// TokenURL: "https://api.pcloud.com/oauth2_token", set by updateTokenURL
 		ClientID:     rcloneClientID,

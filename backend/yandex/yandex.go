@@ -44,8 +44,8 @@ const (
 var (
 	// Description of how to auth for this app
 	oauthConfig = &oauthutil.Config{
-		AuthURL:  "https://oauth.yandex.com/authorize", //same as https://oauth.yandex.ru/authorize
-		TokenURL: "https://oauth.yandex.com/token",     //same as https://oauth.yandex.ru/token
+		AuthURL:      "https://oauth.yandex.com/authorize", //same as https://oauth.yandex.ru/authorize
+		TokenURL:     "https://oauth.yandex.com/token",     //same as https://oauth.yandex.ru/token
 		ClientID:     rcloneClientID,
 		ClientSecret: obscure.MustReveal(rcloneEncryptedClientSecret),
 		RedirectURL:  oauthutil.RedirectURL,

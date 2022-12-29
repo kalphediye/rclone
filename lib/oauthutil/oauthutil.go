@@ -77,19 +77,18 @@ All done. Please go back to rclone.
 
 // Define a configuration structure that we will use to store the OAuth configuration
 // settings. This is based on the union of the configuration structures for the two
-// OAuth modules that we are using (oauth2 and oauth2.clientcrentials), along with a 
+// OAuth modules that we are using (oauth2 and oauth2.clientcrentials), along with a
 // flag indicating if we are going to use the client credential flow
 type Config struct {
-	ClientID string
-	ClientSecret string
-	TokenURL string
-	AuthURL string
-	Scopes []string
-	EndpointParams url.Values
-	RedirectURL string
+	ClientID             string
+	ClientSecret         string
+	TokenURL             string
+	AuthURL              string
+	Scopes               []string
+	EndpointParams       url.Values
+	RedirectURL          string
 	ClientCredentialFlow bool
-	AuthStyle int
-
+	AuthStyle            int
 }
 
 // SharedOptions are shared between backends the utilize an OAuth flow
@@ -113,7 +112,7 @@ var SharedOptions = []fs.Option{{
 	Advanced: true,
 }, {
 	// Not adding this in the global config settings, as this is something specific to OAUTH
-	Name: 	  "client_credential",
+	Name:     "client_credential",
 	Default:  false,
 	Help:     "Use client credential OAuth flow. \n\n This will use the OAUTH2 client Credential Flow as described in RFC 6749.",
 	Advanced: true,
@@ -413,7 +412,6 @@ func NewClientWithBaseClient(ctx context.Context, name string, m configmap.Mappe
 		TokenURL: config.TokenURL,
 	}
 
-
 	// Wrap the TokenSource in our TokenSource which saves changed
 	// tokens in the config file
 	ts := &TokenSource{
@@ -440,17 +438,16 @@ func NewClientCredentialsClient(ctx context.Context, name string, m configmap.Ma
 	conf.ClientSecret = oauthConfig.ClientSecret
 	conf.Scopes = oauthConfig.Scopes
 	conf.TokenURL = oauthConfig.TokenURL
-	
+
 	// Create and return the oauth client credentials client
 	return conf.Client(ctx), nil, nil
 
 }
 
-
 // NewClient gets a token from the config file and configures a Client
 // with it.  It returns the client and a TokenSource which Invalidate may need to be called on
 func NewClient(ctx context.Context, name string, m configmap.Mapper, oauthConfig *Config) (*http.Client, *TokenSource, error) {
-	
+
 	// Check whether we are using the client credentials flow
 	if oauthConfig.ClientCredentialFlow {
 
@@ -487,7 +484,7 @@ type CheckAuthFn func(*Config, *AuthResult) error
 
 // Options for the oauth config
 type Options struct {
-	OAuth2Config *Config          		 // Basic config for oauth2
+	OAuth2Config *Config                 // Basic config for oauth2
 	NoOffline    bool                    // If set then "access_type=offline" parameter is not passed
 	CheckAuth    CheckAuthFn             // When the AuthResult is known the checkAuth function is called if set
 	OAuth2Opts   []oauth2.AuthCodeOption // extra oauth2 options
@@ -767,7 +764,7 @@ func configSetup(ctx context.Context, id, name string, m configmap.Mapper, oauth
 // Exchange the code for a token
 func configExchange(ctx context.Context, name string, m configmap.Mapper, oauthConfig *Config, code string) error {
 	ctx = Context(ctx, fshttp.NewClient(ctx))
-	
+
 	// Create the configuration required for the OAuth flow
 	var oauth2Conf oauth2.Config
 
@@ -780,7 +777,7 @@ func configExchange(ctx context.Context, name string, m configmap.Mapper, oauthC
 	oauth2Conf.Endpoint = oauth2.Endpoint{
 		AuthURL:  oauthConfig.AuthURL,
 		TokenURL: oauthConfig.TokenURL,
-	}	
+	}
 
 	token, err := oauth2Conf.Exchange(ctx, code)
 	if err != nil {

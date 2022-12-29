@@ -64,9 +64,9 @@ const (
 var (
 	// Description of how to auth for this app
 	oauthConfig = &oauthutil.Config{
-		Scopes: nil,
-		AuthURL:  "https://app.box.com/api/oauth2/authorize",
-		TokenURL: "https://app.box.com/api/oauth2/token",
+		Scopes:       nil,
+		AuthURL:      "https://app.box.com/api/oauth2/authorize",
+		TokenURL:     "https://app.box.com/api/oauth2/token",
 		ClientID:     rcloneClientID,
 		ClientSecret: obscure.MustReveal(rcloneEncryptedClientSecret),
 		RedirectURL:  oauthutil.RedirectURL,

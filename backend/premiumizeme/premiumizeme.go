@@ -59,9 +59,9 @@ const (
 var (
 	// Description of how to auth for this app
 	oauthConfig = &oauthutil.Config{
-		Scopes: nil,
-		AuthURL:  "https://www.premiumize.me/authorize",
-		TokenURL: "https://www.premiumize.me/token",
+		Scopes:       nil,
+		AuthURL:      "https://www.premiumize.me/authorize",
+		TokenURL:     "https://www.premiumize.me/token",
 		ClientID:     rcloneClientID,
 		ClientSecret: obscure.MustReveal(rcloneEncryptedClientSecret),
 		RedirectURL:  oauthutil.RedirectURL,

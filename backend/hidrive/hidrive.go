@@ -48,8 +48,8 @@ const (
 var (
 	// Description of how to auth for this app.
 	oauthConfig = &oauthutil.Config{
-		AuthURL:  "https://my.hidrive.com/client/authorize",
-		TokenURL: "https://my.hidrive.com/oauth2/token",
+		AuthURL:      "https://my.hidrive.com/client/authorize",
+		TokenURL:     "https://my.hidrive.com/oauth2/token",
 		ClientID:     rcloneClientID,
 		ClientSecret: obscure.MustReveal(rcloneEncryptedClientSecret),
 		RedirectURL:  oauthutil.TitleBarRedirectURL,

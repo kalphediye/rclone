@@ -53,9 +53,9 @@ var (
 			"WorkDrive.files.ALL",
 		},
 
-		AuthURL:   "https://accounts.zoho.eu/oauth/v2/auth",
-		TokenURL:  "https://accounts.zoho.eu/oauth/v2/token",
-		AuthStyle: int(oauth2.AuthStyleInParams),
+		AuthURL:      "https://accounts.zoho.eu/oauth/v2/auth",
+		TokenURL:     "https://accounts.zoho.eu/oauth/v2/token",
+		AuthStyle:    int(oauth2.AuthStyleInParams),
 		ClientID:     rcloneClientID,
 		ClientSecret: obscure.MustReveal(rcloneEncryptedClientSecret),
 		RedirectURL:  oauthutil.RedirectLocalhostURL,

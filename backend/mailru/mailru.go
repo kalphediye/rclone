@@ -71,10 +71,9 @@ var (
 var oauthConfig = &oauthutil.Config{
 	ClientID:     api.OAuthClientID,
 	ClientSecret: "",
-	AuthURL:   api.OAuthURL,
-	TokenURL:  api.OAuthURL,
-	AuthStyle: int(oauth2.AuthStyleInParams),
-
+	AuthURL:      api.OAuthURL,
+	TokenURL:     api.OAuthURL,
+	AuthStyle:    int(oauth2.AuthStyleInParams),
 }
 
 // Register with Fs
@@ -448,7 +447,7 @@ func (f *Fs) authorize(ctx context.Context, force bool) (err error) {
 		oauth2Conf.Endpoint = oauth2.Endpoint{
 			AuthURL:  oauthConfig.AuthURL,
 			TokenURL: oauthConfig.TokenURL,
-}
+		}
 
 		t, err = oauth2Conf.PasswordCredentialsToken(ctx, f.opt.Username, f.opt.Password)
 	}

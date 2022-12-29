@@ -64,8 +64,8 @@ var (
 	// Description of how to auth for this app
 	storageConfig = &oauthutil.Config{
 		Scopes:       []string{storage.DevstorageReadWriteScope},
-		AuthURL:  	  google.Endpoint.AuthURL,
-		TokenURL:	  google.Endpoint.TokenURL,
+		AuthURL:      google.Endpoint.AuthURL,
+		TokenURL:     google.Endpoint.TokenURL,
 		ClientID:     rcloneClientID,
 		ClientSecret: obscure.MustReveal(rcloneEncryptedClientSecret),
 		RedirectURL:  oauthutil.RedirectURL,

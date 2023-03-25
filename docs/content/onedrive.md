@@ -161,6 +161,16 @@ You may try to [verify you account](https://docs.microsoft.com/en-us/azure/activ
 
 Note: If you have a special region, you may need a different host in step 4 and 5. Here are [some hints](https://github.com/rclone/rclone/blob/bc23bf11db1c78c6ebbf8ea538fbebf7058b4176/backend/onedrive/onedrive.go#L86).
 
+### Using OAuth Client Credential flow
+OAuth Client Credential flow will allow rclone to use permissions directly associated with the Azure AD Enterprise application, rather that adopting the context of an Azure AD user account.
+This flow can be enabled by following the steps below:
+1. Create the Enterprise App registration in the Azure AD portal and obtain a Client ID and Client Secret as described above.
+2. Ensure that the application has the appropriate permissions and they are assigned as *Application Permissions*
+3. Configure the remote, ensuring that *Client ID* and *Client Secret* are entered correctly.   
+4. In the *Advanced Config* section, enter *true* for client_credential and enter the full tenant name (i.e. contoso.com).
+
+**NOTE** Assigning permissions directly to the application means that anyone with the *Client ID* and *Client Secret* can access your OneDrive files. Take care to safeguard these credentials.
+
 
 ### Modification time and hashes
 

@@ -68,14 +68,12 @@ var (
 )
 
 // Description of how to authorize
-var oauthConfig = &oauth2.Config{
+var oauthConfig = &oauthutil.Config{
 	ClientID:     api.OAuthClientID,
 	ClientSecret: "",
-	Endpoint: oauth2.Endpoint{
-		AuthURL:   api.OAuthURL,
-		TokenURL:  api.OAuthURL,
-		AuthStyle: oauth2.AuthStyleInParams,
-	},
+	AuthURL:      api.OAuthURL,
+	TokenURL:     api.OAuthURL,
+	AuthStyle:    int(oauth2.AuthStyleInParams),
 }
 
 // Register with Fs
@@ -437,7 +435,21 @@ func (f *Fs) authorize(ctx context.Context, force bool) (err error) {
 	if err != nil || !tokenIsValid(t) {
 		fs.Infof(f, "Valid token not found, authorizing.")
 		ctx := oauthutil.Context(ctx, f.cli)
-		t, err = oauthConfig.PasswordCredentialsToken(ctx, f.opt.Username, f.opt.Password)
+
+		// Create the configuration required for the OAuth flow
+		var oauth2Conf oauth2.Config
+
+		// Populate the config structure with the content from the
+		// config structure passed into this function
+		oauth2Conf.ClientID = oauthConfig.ClientID
+		oauth2Conf.ClientSecret = oauthConfig.ClientSecret
+		oauth2Conf.Scopes = oauthConfig.Scopes
+		oauth2Conf.Endpoint = oauth2.Endpoint{
+			AuthURL:  oauthConfig.AuthURL,
+			TokenURL: oauthConfig.TokenURL,
+		}
+
+		t, err = oauth2Conf.PasswordCredentialsToken(ctx, f.opt.Username, f.opt.Password)
 	}
 	if err == nil && !tokenIsValid(t) {
 		err = errors.New("invalid token")

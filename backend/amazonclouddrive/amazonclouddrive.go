@@ -34,7 +34,6 @@ import (
 	"github.com/rclone/rclone/lib/encoder"
 	"github.com/rclone/rclone/lib/oauthutil"
 	"github.com/rclone/rclone/lib/pacer"
-	"golang.org/x/oauth2"
 )
 
 const (
@@ -50,12 +49,10 @@ const (
 // Globals
 var (
 	// Description of how to auth for this app
-	acdConfig = &oauth2.Config{
-		Scopes: []string{"clouddrive:read_all", "clouddrive:write"},
-		Endpoint: oauth2.Endpoint{
-			AuthURL:  "https://www.amazon.com/ap/oa",
-			TokenURL: "https://api.amazon.com/auth/o2/token",
-		},
+	acdConfig = &oauthutil.Config{
+		Scopes:       []string{"clouddrive:read_all", "clouddrive:write"},
+		AuthURL:      "https://www.amazon.com/ap/oa",
+		TokenURL:     "https://api.amazon.com/auth/o2/token",
 		ClientID:     "",
 		ClientSecret: "",
 		RedirectURL:  oauthutil.RedirectURL,

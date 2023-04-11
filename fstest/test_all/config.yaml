@@ -364,11 +364,6 @@ backends:
    subdir:   false
    fastlist: false
  - backend:  "seafile"
-   remote:   "TestSeafileV6:"
-   fastlist: false
-   ignore:
-     - TestIntegration/FsMkdir/FsPutFiles/FsDirMove
- - backend:  "seafile"
    remote:   "TestSeafile:"
    fastlist: true
  - backend:  "seafile"

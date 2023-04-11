@@ -671,33 +671,97 @@ func (f *Fs) getUploadLink(ctx context.Context, libraryID string) (string, error
 	return result, nil
 }
 
-func (f *Fs) upload(ctx context.Context, in io.Reader, uploadLink, filePath string) (*api.FileDetail, error) {
+// getFileUploadedSize returns the size already uploaded on the server
+func (f *Fs) getFileUploadedSize(ctx context.Context, libraryID, filePath string) (int64, error) {
 	// API Documentation
 	// https://download.seafile.com/published/web-api/v2.1/file-upload.md
+	if libraryID == "" {
+		return 0, errors.New("cannot get file uploaded size without a library")
+	}
+	fs.Debugf(nil, "filePath=%q", filePath)
 	fileDir, filename := path.Split(filePath)
+	fileDir = "/" + strings.TrimSuffix(fileDir, "/")
+	if fileDir == "" {
+		fileDir = "/"
+	}
+	opts := rest.Opts{
+		Method: "GET",
+		Path:   APIv21 + libraryID + "/file-uploaded-bytes/",
+		Parameters: url.Values{
+			"parent_dir": {f.opt.Enc.FromStandardPath(fileDir)},
+			"file_name":  {f.opt.Enc.FromStandardPath(filename)},
+		},
+	}
+
+	result := api.FileUploadedBytes{}
+	var resp *http.Response
+	var err error
+	err = f.pacer.Call(func() (bool, error) {
+		resp, err = f.srv.CallJSON(ctx, &opts, nil, &result)
+		return f.shouldRetry(ctx, resp, err)
+	})
+	if err != nil {
+		if resp != nil {
+			if resp.StatusCode == 401 || resp.StatusCode == 403 {
+				return 0, fs.ErrorPermissionDenied
+			}
+		}
+		return 0, fmt.Errorf("failed to get file uploaded size for parent_dir=%q and file_name=%q: %w", fileDir, filename, err)
+	}
+	return result.FileUploadedBytes, nil
+}
+
+func (f *Fs) prepareFileUpload(ctx context.Context, in io.Reader, uploadLink, filePath string, contentRange contentRanger) (*rest.Opts, error) {
+	fileDir, filename := path.Split(filePath)
+	safeFilename := f.opt.Enc.FromStandardName(filename)
 	parameters := url.Values{
 		"parent_dir":        {"/"},
 		"relative_path":     {f.opt.Enc.FromStandardPath(fileDir)},
 		"need_idx_progress": {"true"},
 		"replace":           {"1"},
 	}
-	formReader, contentType, _, err := rest.MultipartUpload(ctx, in, parameters, "file", f.opt.Enc.FromStandardName(filename))
-	if err != nil {
-		return nil, fmt.Errorf("failed to make multipart upload: %w", err)
+
+	contentRangeHeader := contentRange.getContentRangeHeader()
+	opts := &rest.Opts{
+		Method:               http.MethodPost,
+		RootURL:              uploadLink,
+		Body:                 in,
+		ContentRange:         contentRangeHeader,
+		Parameters:           url.Values{"ret-json": {"1"}}, // It needs to be on the url, not in the body parameters
+		MultipartParams:      parameters,
+		MultipartContentName: "file",
+		MultipartFileName:    safeFilename,
+	}
+	if contentRangeHeader != "" {
+		// When using resumable upload, the name of the file is no longer retrieved from the "file" field of the form.
+		// It's instead retrieved from the header.
+		opts.ExtraHeaders = map[string]string{
+			"Content-Disposition": "attachment; filename=\"" + safeFilename + "\"",
+		}
 	}
 
-	opts := rest.Opts{
-		Method:      "POST",
-		RootURL:     uploadLink,
-		Body:        formReader,
-		ContentType: contentType,
-		Parameters:  url.Values{"ret-json": {"1"}}, // It needs to be on the url, not in the body parameters
+	chunkSize := contentRange.getChunkSize()
+	if chunkSize > 0 {
+		// seafile might not make use of the Content-Length header but a proxy (or reverse proxy) in the middle might
+		opts.ContentLength = &chunkSize
 	}
+	return opts, nil
+}
+
+func (f *Fs) upload(ctx context.Context, in io.Reader, uploadLink, filePath string, size int64) (*api.FileDetail, error) {
+	// API Documentation
+	// https://download.seafile.com/published/web-api/v2.1/file-upload.md
+	contentRange := newStreamedContentRange(size)
+	opts, err := f.prepareFileUpload(ctx, in, uploadLink, filePath, contentRange)
+	if err != nil {
+		return nil, err
+	}
+
 	result := make([]api.FileDetail, 1)
 	var resp *http.Response
-	// If an error occurs during the call, do not attempt to retry: The upload link is single use only
+	// We do not attempt to retry if an error occurs during the call, as we don't know the state of the reader
 	err = f.pacer.CallNoRetry(func() (bool, error) {
-		resp, err = f.srv.CallJSON(ctx, &opts, nil, &result)
+		resp, err = f.srv.CallJSON(ctx, opts, nil, &result)
 		return f.shouldRetryUpload(ctx, resp, err)
 	})
 	if err != nil {
@@ -706,11 +770,102 @@ func (f *Fs) upload(ctx context.Context, in io.Reader, uploadLink, filePath stri
 				return nil, fs.ErrorPermissionDenied
 			}
 			if resp.StatusCode == 500 {
-				// This is a temporary error - we will get a new upload link before retrying
+				// This is quite common on heavy load
 				return nil, ErrorInternalDuringUpload
 			}
 		}
 		return nil, fmt.Errorf("failed to upload file: %w", err)
+	}
+	if len(result) > 0 {
+		result[0].Parent = f.opt.Enc.ToStandardPath(result[0].Parent)
+		result[0].Name = f.opt.Enc.ToStandardName(result[0].Name)
+		return &result[0], nil
+	}
+	// no file results sent back
+	return nil, ErrorInternalDuringUpload
+}
+
+func (f *Fs) uploadChunk(ctx context.Context, in io.Reader, uploadLink, filePath string, contentRange contentRanger) error {
+	// API Documentation
+	// https://download.seafile.com/published/web-api/v2.1/file-upload.md
+	chunkSize := int(contentRange.getChunkSize())
+	buffer := f.getBuf(chunkSize)
+	defer f.putBuf(buffer)
+
+	read, err := io.ReadFull(in, buffer)
+	if err != nil {
+		return fmt.Errorf("error reading from source: %w", err)
+	}
+	if chunkSize > 0 && read != chunkSize {
+		return fmt.Errorf("expected to read %d from source, but got %d", chunkSize, read)
+	}
+
+	result := api.ChunkUpload{}
+	var resp *http.Response
+	err = f.pacer.Call(func() (bool, error) {
+		// recreate a reader on the temporary buffer
+		in = bytes.NewReader(buffer)
+		opts, err := f.prepareFileUpload(ctx, in, uploadLink, filePath, contentRange)
+		if err != nil {
+			return false, err
+		}
+		resp, err = f.srv.CallJSON(ctx, opts, nil, &result)
+		return f.shouldRetry(ctx, resp, err)
+	})
+	if err != nil {
+		if resp != nil {
+			if resp.StatusCode == 401 || resp.StatusCode == 403 {
+				return fs.ErrorPermissionDenied
+			}
+			if resp.StatusCode == 500 {
+				return fmt.Errorf("chunk upload %s: %w", contentRange.getContentRangeHeader(), ErrorInternalDuringUpload)
+			}
+		}
+		return fmt.Errorf("failed to upload chunk %s: %w", contentRange.getContentRangeHeader(), err)
+	}
+	if !result.Success {
+		return errors.New("upload failed")
+	}
+	return nil
+}
+
+func (f *Fs) uploadLastChunk(ctx context.Context, in io.Reader, uploadLink, filePath string, contentRange contentRanger) (*api.FileDetail, error) {
+	// API Documentation
+	// https://download.seafile.com/published/web-api/v2.1/file-upload.md
+	chunkSize := int(contentRange.getChunkSize())
+	buffer := f.getBuf(chunkSize)
+	defer f.putBuf(buffer)
+
+	read, err := io.ReadFull(in, buffer)
+	if err != nil {
+		return nil, fmt.Errorf("error reading from source: %w", err)
+	}
+	if chunkSize > 0 && read != chunkSize {
+		return nil, fmt.Errorf("expected to read %d from source, but got %d", chunkSize, read)
+	}
+
+	result := make([]api.FileDetail, 1)
+	var resp *http.Response
+	err = f.pacer.Call(func() (bool, error) {
+		// recreate a reader on the buffer
+		in = bytes.NewReader(buffer)
+		opts, err := f.prepareFileUpload(ctx, in, uploadLink, filePath, contentRange)
+		if err != nil {
+			return false, err
+		}
+		resp, err = f.srv.CallJSON(ctx, opts, nil, &result)
+		return f.shouldRetry(ctx, resp, err)
+	})
+	if err != nil {
+		if resp != nil {
+			if resp.StatusCode == 401 || resp.StatusCode == 403 {
+				return nil, fs.ErrorPermissionDenied
+			}
+			if resp.StatusCode == 500 {
+				return nil, fmt.Errorf("last chunk: %w", ErrorInternalDuringUpload)
+			}
+		}
+		return nil, fmt.Errorf("failed to upload last chunk: %w", err)
 	}
 	if len(result) > 0 {
 		result[0].Parent = f.opt.Enc.ToStandardPath(result[0].Parent)

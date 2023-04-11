@@ -70,7 +70,7 @@ func TestUploadWholeFileWithErrorNoRetry(t *testing.T) {
 	})
 	// upload will fail
 	handler.HandleFunc("/upload-api/temp_upload", func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
+		defer func() { _ = r.Body.Close() }()
 		w.WriteHeader(http.StatusInternalServerError)
 	})
 
@@ -101,7 +101,7 @@ func TestUploadWholeFile(t *testing.T) {
 		_, _ = w.Write([]byte(fmt.Sprintf(`"%s/upload-api/temp_upload"`, server.URL)))
 	})
 	handler.HandleFunc("/upload-api/temp_upload", func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
+		defer func() { _ = r.Body.Close() }()
 
 		mediaType, params, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 		assert.NoError(t, err)
@@ -157,7 +157,7 @@ func TestUploadFileByChunksWithRetryOnError(t *testing.T) {
 
 	// call to upload chunks
 	handler.HandleFunc("/upload-api/temp_upload", func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
+		defer func() { _ = r.Body.Close() }()
 
 		chunkCount++
 		t.Logf("received chunk %d", chunkCount)

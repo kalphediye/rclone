@@ -48,7 +48,7 @@ const (
 	defaultChunkSize    = 127 * fs.Mebi
 	maxChunkSize        = 511 * fs.Mebi
 	defaultUploadCutoff = 255 * fs.Mebi
-	maxParts            = 10000
+	maxParts            = 100000
 	minPacer            = 100
 )
 

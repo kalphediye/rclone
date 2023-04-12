@@ -57,7 +57,7 @@ start() {
     echo pass=$(rclone obscure ${SEAFILE_ADMIN_PASSWORD})
     echo library=${TEST_LIBRARY}
     echo library_key=$(rclone obscure ${TEST_LIBRARY_PASSWORD})
-    echo min_pacer=10
+    echo min_pacer=100
 }
 
 stop() {

@@ -52,7 +52,7 @@ start() {
     echo user=${SEAFILE_ADMIN_EMAIL}
     echo pass=$(rclone obscure ${SEAFILE_ADMIN_PASSWORD})
     echo library=My Library
-    echo min_pacer=10
+    echo min_pacer=100
 }
 
 stop() {

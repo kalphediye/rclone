@@ -31,14 +31,28 @@ var (
 // ==================== Seafile API ====================
 
 func (f *Fs) getAuthorizationToken(ctx context.Context) (string, error) {
-	return getAuthorizationToken(ctx, f.srv, f.opt.User, f.opt.Password, "")
+	opts, request := prepareAuthorizationRequest(f.opt.User, f.opt.Password, "")
+	result := api.AuthenticationResult{}
+
+	err := f.pacer.Call(func() (bool, error) {
+		resp, err := f.srv.CallJSON(ctx, &opts, &request, &result)
+		return f.shouldRetry(ctx, resp, err)
+	})
+	if err != nil {
+		// This is only going to be http errors here
+		return "", fmt.Errorf("failed to authenticate: %w", err)
+	}
+	if result.Errors != nil && len(result.Errors) > 0 {
+		return "", errors.New(strings.Join(result.Errors, ", "))
+	}
+	if result.Token == "" {
+		// No error in "non_field_errors" field but still empty token
+		return "", errors.New("failed to authenticate")
+	}
+	return result.Token, nil
 }
 
-// getAuthorizationToken can be called outside of an fs (during configuration of the remote to get the authentication token)
-// it's doing a single call (no pacer involved)
-func getAuthorizationToken(ctx context.Context, srv *rest.Client, user, password, oneTimeCode string) (string, error) {
-	// API Documentation
-	// https://download.seafile.com/published/web-api/home.md#user-content-Quick%20Start
+func prepareAuthorizationRequest(user, password, oneTimeCode string) (rest.Opts, api.AuthenticationRequest) {
 	opts := rest.Opts{
 		Method:       "POST",
 		Path:         "api2/auth-token/",
@@ -55,6 +69,15 @@ func getAuthorizationToken(ctx context.Context, srv *rest.Client, user, password
 		Username: user,
 		Password: password,
 	}
+	return opts, request
+}
+
+// getAuthorizationToken is called outside of an fs (during configuration of the remote to get the authentication token)
+// it's doing a single call (no pacer involved)
+func getAuthorizationToken(ctx context.Context, srv *rest.Client, user, password, oneTimeCode string) (string, error) {
+	// API Documentation
+	// https://download.seafile.com/published/web-api/home.md#user-content-Quick%20Start
+	opts, request := prepareAuthorizationRequest(user, password, oneTimeCode)
 	result := api.AuthenticationResult{}
 
 	_, err := srv.CallJSON(ctx, &opts, &request, &result)
@@ -672,6 +695,8 @@ func (f *Fs) getUploadLink(ctx context.Context, libraryID string) (string, error
 }
 
 // getFileUploadedSize returns the size already uploaded on the server
+//
+//nolint:unused
 func (f *Fs) getFileUploadedSize(ctx context.Context, libraryID, filePath string) (int64, error) {
 	// API Documentation
 	// https://download.seafile.com/published/web-api/v2.1/file-upload.md

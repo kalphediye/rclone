@@ -151,6 +151,7 @@ func TestFailedChunkUploadWithProxiedServer(t *testing.T) {
 			reader, err := object.Open(context.Background())
 			assert.NoError(t, err)
 			read, err := io.ReadAll(reader)
+			assert.NoError(t, err)
 			assert.Equal(t, data, read)
 
 			// clean up

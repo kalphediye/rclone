@@ -146,6 +146,7 @@ type ConfigInfo struct {
 	TerminalColorMode       TerminalColorMode
 	DefaultTime             Time // time that directories with no time should display
 	Inplace                 bool // Download directly to destination file instead of atomic download to temp/rename
+	WinCryptAPI             bool
 }
 
 // NewConfig creates a new config with everything set to the default

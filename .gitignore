@@ -16,3 +16,5 @@ Thumbs.db
 __pycache__
 .DS_Store
 *.kate-swp
+*debug*bin*
+.vscode/

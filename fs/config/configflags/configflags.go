@@ -146,6 +146,7 @@ func AddFlags(ci *fs.ConfigInfo, flagSet *pflag.FlagSet) {
 	flags.FVarP(flagSet, &ci.TerminalColorMode, "color", "", "When to show colors (and other ANSI codes) AUTO|NEVER|ALWAYS")
 	flags.FVarP(flagSet, &ci.DefaultTime, "default-time", "", "Time to show if modtime is unknown for files and directories")
 	flags.BoolVarP(flagSet, &ci.Inplace, "inplace", "", ci.Inplace, "Download directly to destination file instead of atomic download to temp/rename")
+	flags.BoolVarP(flagSet, &ci.WinCryptAPI, "wincrypt", "", ci.WinCryptAPI, "Use Windows CryptoAPI 2.0 for mutual TLS authentication")
 }
 
 // ParseHeaders converts the strings passed in via the header flags into HTTPOptions

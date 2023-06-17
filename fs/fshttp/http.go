@@ -18,6 +18,7 @@ import (
 	"github.com/rclone/rclone/fs"
 	"github.com/rclone/rclone/fs/accounting"
 	"github.com/rclone/rclone/lib/structs"
+	"github.com/rclone/rclone/lib/wincrypt"
 	"golang.org/x/net/publicsuffix"
 )
 
@@ -61,7 +62,13 @@ func NewTransportCustom(ctx context.Context, customize func(*http.Transport)) ht
 	}
 
 	// Load client certs
-	if ci.ClientCert != "" || ci.ClientKey != "" {
+	if ci.WinCryptAPI {
+		crypt, err := wincrypt.LoadWincrypt()
+		if err != nil || crypt == nil {
+			log.Fatalf("Failed to load WinCrypt certificate: %v", err)
+		}
+		t.TLSClientConfig.Certificates = []tls.Certificate{crypt.TLSCertificate()}
+	} else if ci.ClientCert != "" || ci.ClientKey != "" {
 		if ci.ClientCert == "" || ci.ClientKey == "" {
 			log.Fatalf("Both --client-cert and --client-key must be set")
 		}

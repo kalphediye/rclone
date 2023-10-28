@@ -38,6 +38,7 @@ docs = [
     "chunker.md",
     "sharefile.md",
     "crypt.md",
+    "cryptomator.md",
     "compress.md",
     "combine.md",
     "dropbox.md",

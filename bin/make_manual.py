@@ -69,6 +69,7 @@ docs = [
     "swift.md",
     "pcloud.md",
     "pikpak.md",
+    "pixeldrain.md",
     "premiumizeme.md",
     "protondrive.md",
     "putio.md",
@@ -114,7 +115,7 @@ commands_order = [
     "rclone_version.md",
     "rclone_cleanup.md",
     "rclone_dedupe.md",
-]    
+]
 
 # Docs which aren't made into outfile
 ignore_docs = [

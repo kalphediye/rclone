@@ -49,11 +49,6 @@ var (
 	MatchTestRemote = regexp.MustCompile(`^rclone-test-[abcdefghijklmnopqrstuvwxyz0123456789]{24}$`)
 )
 
-// Seed the random number generator
-func init() {
-	_ = random.Seed()
-}
-
 // Initialise rclone for testing
 func Initialise() {
 	ctx := context.Background()
@@ -284,7 +279,7 @@ func CheckListingWithRoot(t *testing.T, f fs.Fs, dir string, items []Item, expec
 		listingOK = wantListing == gotListing
 		if listingOK && (expectedDirs == nil || len(dirs) == len(expectedDirs)) {
 			// Put an extra sleep in if we did any retries just to make sure it really
-			// is consistent (here is looking at you Amazon Drive!)
+			// is consistent
 			if i != 1 {
 				extraSleep := 5*time.Second + sleep
 				t.Logf("Sleeping for %v just to make sure", extraSleep)

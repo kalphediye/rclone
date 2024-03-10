@@ -190,34 +190,6 @@ func TestPin(t *testing.T) {
 	Unpin(f2)
 }
 
-// files create a second cache entry (for its parent)
-// test that they are pinned/unpinned in lockstep
-func TestPinFile(t *testing.T) {
-	create := mockNewFs(t)
-
-	// Test pinning and unpinning nonexistent
-	f, err := mockfs.NewFs(context.Background(), "mock", "/file.txt", nil)
-	require.NoError(t, err)
-	Pin(f)
-	Unpin(f)
-
-	// Now test pinning an existing
-	f2, err := GetFn(context.Background(), "mock:/file.txt", create)
-	require.Equal(t, fs.ErrorIsFile, err)
-
-	Pin(f2)
-	assert.Equal(t, 2, Entries())
-	pinned, unpinned := EntriesWithPinCount()
-	assert.Equal(t, 2, pinned)
-	assert.Equal(t, 0, unpinned)
-
-	Unpin(f2)
-	assert.Equal(t, 2, Entries())
-	pinned, unpinned = EntriesWithPinCount()
-	assert.Equal(t, 0, pinned)
-	assert.Equal(t, 2, unpinned)
-}
-
 func TestClearConfig(t *testing.T) {
 	create := mockNewFs(t)
 

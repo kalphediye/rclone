@@ -188,38 +188,6 @@ func (c *Cache) DeletePrefix(prefix string) (deleted int) {
 	return deleted
 }
 
-// PinPrefix pins all entries with the given prefix
-//
-// Returns number of entries pinned
-func (c *Cache) PinPrefix(prefix string) (pinned int) {
-	c.mu.Lock()
-	for key := range c.cache {
-		if !strings.HasPrefix(key, prefix) {
-			continue
-		}
-		defer c.Pin(key)
-		pinned++
-	}
-	c.mu.Unlock()
-	return pinned
-}
-
-// UnpinPrefix unpins all entries with the given prefix
-//
-// Returns number of entries unpinned
-func (c *Cache) UnpinPrefix(prefix string) (unpinned int) {
-	c.mu.Lock()
-	for key := range c.cache {
-		if !strings.HasPrefix(key, prefix) {
-			continue
-		}
-		defer c.Unpin(key)
-		unpinned++
-	}
-	c.mu.Unlock()
-	return unpinned
-}
-
 // Rename renames the item at oldKey to newKey.
 //
 // If there was an existing item at newKey then it takes precedence
@@ -291,20 +259,4 @@ func (c *Cache) SetFinalizer(finalize func(interface{})) {
 	c.mu.Lock()
 	c.finalize = finalize
 	c.mu.Unlock()
-}
-
-// EntriesWithPinCount returns the number of pinned and unpinned entries in the cache
-//
-// Each entry is counted only once, regardless of entry.pinCount
-func (c *Cache) EntriesWithPinCount() (pinned, unpinned int) {
-	c.mu.Lock()
-	for _, entry := range c.cache {
-		if entry.pinCount <= 0 {
-			unpinned++
-		} else {
-			pinned++
-		}
-	}
-	c.mu.Unlock()
-	return pinned, unpinned
 }

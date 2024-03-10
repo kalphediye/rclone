@@ -4,7 +4,6 @@ package cache
 import (
 	"context"
 	"runtime"
-	"strings"
 	"sync"
 
 	"github.com/rclone/rclone/fs"
@@ -100,9 +99,7 @@ func GetFn(ctx context.Context, fsString string, create func(ctx context.Context
 // Pin f into the cache until Unpin is called
 func Pin(f fs.Fs) {
 	createOnFirstUse()
-	configString := fs.ConfigString(f)
-	c.Pin(configString)
-	c.PinPrefix(strings.TrimSuffix(configString, "/")) // also pin its aliases, if any
+	c.Pin(fs.ConfigString(f))
 }
 
 // PinUntilFinalized pins f into the cache until x is garbage collected
@@ -114,14 +111,13 @@ func PinUntilFinalized(f fs.Fs, x interface{}) {
 	runtime.SetFinalizer(x, func(_ interface{}) {
 		Unpin(f)
 	})
+
 }
 
 // Unpin f from the cache
 func Unpin(f fs.Fs) {
 	createOnFirstUse()
-	configString := fs.ConfigString(f)
-	c.Unpin(configString)
-	c.UnpinPrefix(strings.TrimSuffix(configString, "/")) // also unpin its aliases, if any
+	c.Unpin(fs.ConfigString(f))
 }
 
 // To avoid circular dependencies these are filled in by fs/rc/jobs/job.go
@@ -203,12 +199,4 @@ func Clear() {
 func Entries() int {
 	createOnFirstUse()
 	return c.Entries()
-}
-
-// EntriesWithPinCount returns the number of pinned and unpinned entries in the cache
-//
-// Each entry is counted only once, regardless of entry.pinCount
-func EntriesWithPinCount() (pinned, unpinned int) {
-	createOnFirstUse()
-	return c.EntriesWithPinCount()
 }

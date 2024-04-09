@@ -452,7 +452,7 @@ func (d *DriveService) UploadFile(ctx context.Context, in io.Reader, size int64,
 		return nil, resp, err
 	}
 	_, _, StartingDocumentID := DeconstructDriveID(folderID)
-	r := NewUpdateFileRequest()
+	r := NewUpdateFileInfo()
 	r.DocumentID = responseInfo[0].DocumentId
 	r.Path.Path = name
 	r.Path.StartingDocumentID = StartingDocumentID
@@ -468,7 +468,7 @@ func (d *DriveService) UploadFile(ctx context.Context, in io.Reader, size int64,
 	// return d.UpdateFile(ctx, responseInfo[0].DocumentId, name, folderID, mTime, singleFileResponse.SingleFile)
 }
 
-func (d *DriveService) UpdateFile(ctx context.Context, r *UpdateFileRequest) (*DriveItem, *http.Response, error) {
+func (d *DriveService) UpdateFile(ctx context.Context, r *UpdateFileInfo) (*DriveItem, *http.Response, error) {
 
 	// func (d *DriveService) UpdateFile(ctx context.Context, documentID, name, folderID string, mTime time.Time, singleFile *SingleFileInfo) (*DriveItem, *http.Response, error) {
 	// _, _, starting_document_id := DeconstructId(folderID)
@@ -519,6 +519,9 @@ func (d *DriveService) UpdateFile(ctx context.Context, r *UpdateFileRequest) (*D
 	item := DriveItem{
 		Drivewsid:    "FILE::com.apple.CloudDocs::" + doc.DocumentID,
 		Docwsid:      doc.DocumentID,
+		Itemid:       doc.ItemID,
+		Etag:         doc.Etag,
+		ParentID:     doc.ParentID,
 		DateModified: time.Unix(r.Mtime, 0),
 		DateCreated:  time.Unix(r.Mtime, 0),
 		Type:         doc.Type,
@@ -535,7 +538,7 @@ func (d *DriveService) UpdateFile(ctx context.Context, r *UpdateFileRequest) (*D
 // 	).refresh();
 // }
 
-type UpdateFileRequest struct {
+type UpdateFileInfo struct {
 	AllowConflict   bool   `json:"allow_conflict"`
 	Btime           int64  `json:"btime"`
 	Command         string `json:"command"`
@@ -562,8 +565,8 @@ type FileFlags struct {
 	IsWritable   bool `json:"is_writable"`
 }
 
-func NewUpdateFileRequest() UpdateFileRequest {
-	return UpdateFileRequest{
+func NewUpdateFileInfo() UpdateFileInfo {
+	return UpdateFileInfo{
 		Command:         "add_file",
 		CreateShortGUID: true,
 		AllowConflict:   true,

@@ -18,6 +18,7 @@ import (
 	"github.com/rclone/rclone/fs/config/configmap"
 	"github.com/rclone/rclone/fs/config/configstruct"
 	"github.com/rclone/rclone/fs/config/obscure"
+	"github.com/rclone/rclone/fs/fserrors"
 
 	"github.com/rclone/rclone/backend/icloud/api"
 	"github.com/rclone/rclone/fs/hash"
@@ -285,6 +286,12 @@ func (f *Fs) Hashes() hash.Set {
 // 	panic("unimplemented")
 // }
 
+// Purge all files in the directory specified
+//
+// Implement this if you have a way of deleting all the files
+// quicker than just running Remove() on the result of List()
+//
+// Return an error if it doesn't exist
 func (f *Fs) Purge(ctx context.Context, dir string) error {
 	if dir == "" {
 		return fs.ErrorCantPurge
@@ -409,7 +416,7 @@ func (f *Fs) Copy(ctx context.Context, src fs.Object, remote string) (fs.Object,
 
 	// build request
 	_, _, StartingDocumentID := api.DeconstructDriveID(pathID)
-	r := api.NewUpdateFileRequest()
+	r := api.NewUpdateFileInfo()
 	r.DocumentID = doc.DocumentID
 	r.Path.Path = file
 	r.Path.StartingDocumentID = StartingDocumentID
@@ -434,6 +441,14 @@ func (f *Fs) Copy(ctx context.Context, src fs.Object, remote string) (fs.Object,
 		return nil, err
 	}
 
+	// todo remove copy if something went wrong
+	// defer func() {
+	// 	fmt.Print("defer")
+	// 	if err != nil {
+	// 		fmt.Print("ERROR")
+	// 	}
+	// }()
+
 	// cheat unit tests
 	obj.modTime = srcObj.modTime
 	obj.createdTime = srcObj.createdTime
@@ -454,6 +469,10 @@ func (f *Fs) Put(ctx context.Context, in io.Reader, src fs.ObjectInfo, options .
 	size := src.Size()
 	if size < 0 {
 		return nil, errors.New("file size unknown")
+	}
+
+	if size == 0 {
+		return nil, fs.ErrorCantUploadEmptyFiles
 	}
 
 	existingObj, err := f.NewObject(ctx, src.Remote())
@@ -484,8 +503,8 @@ func (f *Fs) DirCacheFlush() {
 	f.dirCache.ResetRoot()
 }
 
-func (f *Fs) parseNormalizedID(id string) (string, string) {
-	split := strings.Split(id, "#")
+func (f *Fs) parseNormalizedID(rid string) (id string, etag string) {
+	split := strings.Split(rid, "#")
 	if len(split) == 1 {
 		return split[0], ""
 	}
@@ -600,23 +619,19 @@ func (f *Fs) DirMove(ctx context.Context, src fs.Fs, srcRemote, dstRemote string
 		return fs.ErrorCantDirMove
 	}
 
-	// srcID, srcDirectoryID, srcLeaf, dstDirectoryID, dstLeaf, err := f.dirCache.DirMove(ctx, srcFs.dirCache, srcFs.root, srcRemote, f.root, dstRemote)
-	// if err != nil {
-	// 	return err
-	// }
-	// fs.Debugf("HUH", srcRemote, dstRemote)
 	dstLeaf, dstDirectoryID, _, err := f.FindPath(ctx, dstRemote, true)
 	if err != nil {
 		return err
 	}
 
 	srcLeaf, srcDirectoryID, srcEtag, err := f.FindPath(ctx, srcRemote, true)
-	// fs.Debugf("HUH", srcLeaf, srcDirectoryID, srcEtag)
 	if err != nil {
 		return err
 	}
 
-	// fs.Debugf("YOO:", srcRemote, dstRemote)
+	if srcDirectoryID == dstDirectoryID {
+		return fs.ErrorDirExists
+	}
 
 	_, err = f.move(ctx, srcDirectoryID, srcDirectoryID, srcLeaf, srcEtag, dstDirectoryID, dstLeaf)
 	if err != nil {
@@ -634,21 +649,26 @@ func (f *Fs) move(ctx context.Context, ID, srcDirectoryID, srcLeaf, srcEtag, dst
 	var resp *http.Response
 	var item *api.DriveItem
 	var err error
-
+	//fmt.Println(ID, srcDirectoryID, srcLeaf, srcEtag, dstDirectoryID, dstLeaf)
 	// move
-	if srcDirectoryID != dstDirectoryID && srcLeaf == dstLeaf {
+	if srcDirectoryID != dstDirectoryID {
 		if err = f.pacer.Call(func() (bool, error) {
-			id, etag := f.parseNormalizedID(ID)
-			item, resp, err = service.MoveItemByID(ctx, id, etag, dstDirectoryID, true)
+			id, _ := f.parseNormalizedID(ID)
+			item, resp, err = service.MoveItemByID(ctx, id, srcEtag, dstDirectoryID, true)
 			return shouldRetry(ctx, resp, err)
 		}); err != nil {
 			return nil, err
 		}
+
+		// also gotta rename
+		if srcLeaf != dstLeaf {
+			return f.move(ctx, ID, item.ParentID, srcLeaf, item.Etag, dstDirectoryID, dstLeaf)
+		}
 		// rename
 	} else if srcDirectoryID == dstDirectoryID && srcLeaf != dstLeaf {
 		if err = f.pacer.Call(func() (bool, error) {
-			id, etag := f.parseNormalizedID(ID)
-			item, resp, err = service.RenameItemByID(ctx, id, etag, dstLeaf, true)
+			id, _ := f.parseNormalizedID(ID)
+			item, resp, err = service.RenameItemByID(ctx, id, srcEtag, dstLeaf, true)
 			return shouldRetry(ctx, resp, err)
 		}); err != nil {
 			return item, err
@@ -715,6 +735,23 @@ func ReadCookies(raw string) []*http.Cookie {
 }
 
 func shouldRetry(ctx context.Context, resp *http.Response, err error) (bool, error) {
+	if fserrors.ContextError(ctx, &err) {
+		return false, err
+	}
+
+	if err == nil {
+		return false, err
+	}
+
+	switch resp.StatusCode {
+	case 503:
+		fs.Debugf(nil, "Sleeping for 1 seconds due to: %v", err)
+		time.Sleep(1 * time.Second)
+		return true, err
+
+	default:
+	}
+
 	return false, err
 }
 
@@ -935,7 +972,6 @@ func (o *Object) Remove(ctx context.Context) error {
 		_, resp, err = service.MoveItemToTrashByID(ctx, o.id, o.etag, true)
 		return shouldRetry(ctx, resp, err)
 	}); err != nil {
-		fmt.Print("YA")
 		return err
 	}
 
@@ -947,7 +983,7 @@ func (o *Object) Remove(ctx context.Context) error {
 
 // SetModTime implements fs.Object.
 func (o *Object) SetModTime(ctx context.Context, t time.Time) error {
-	panic("unimplemented")
+	return fs.ErrorCantSetModTime
 }
 
 // Size implements fs.Object.
@@ -957,7 +993,7 @@ func (o *Object) Size() int64 {
 
 // Storable implements fs.Object.
 func (o *Object) Storable() bool {
-	panic("unimplemented")
+	return true
 }
 
 // String implements fs.Object.
@@ -977,7 +1013,6 @@ func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, op
 		return errors.New("file size unknown")
 	}
 
-	// Wel we can actually, but it will result in a 404 while downloading.
 	if size == 0 {
 		return fs.ErrorCantUploadEmptyFiles
 	}

@@ -97,7 +97,7 @@ func (d *DriveService) GetItemsByDriveID(ctx context.Context, ids []string, incl
 func (d *DriveService) GetDocByPath(ctx context.Context, path string) (*Document, *http.Response, error) {
 	values := url.Values{}
 	values.Set("path", path)
-	values.Set("unified_format", "false") // important
+	values.Set("unified_format", "false")
 	opts := rest.Opts{
 		Method:       "GET",
 		Path:         "/ws/" + defaultZone + "/list/lookup_by_path",
@@ -106,6 +106,26 @@ func (d *DriveService) GetDocByPath(ctx context.Context, path string) (*Document
 		Parameters:   values,
 	}
 	var item *Document
+	resp, err := d.icloud.Session.Request(ctx, opts, nil, &item)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return item, resp, err
+}
+
+func (d *DriveService) GetItemByPath(ctx context.Context, path string) (*DriveItem, *http.Response, error) {
+	values := url.Values{}
+	values.Set("path", path)
+	values.Set("unified_format", "true")
+	opts := rest.Opts{
+		Method:       "GET",
+		Path:         "/ws/" + defaultZone + "/list/lookup_by_path",
+		ExtraHeaders: d.icloud.Session.GetHeaders(map[string]string{}),
+		RootURL:      d.docsEndpoint,
+		Parameters:   values,
+	}
+	var item *DriveItem
 	resp, err := d.icloud.Session.Request(ctx, opts, nil, &item)
 	if err != nil {
 		return nil, resp, err

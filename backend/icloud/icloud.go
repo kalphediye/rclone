@@ -2,6 +2,7 @@
 package icloud
 
 import (
+	"bytes"
 	"context"
 	"path"
 	"path/filepath"
@@ -198,24 +199,24 @@ func Config(ctx context.Context, name string, m configmap.Mapper, config fs.Conf
 	return nil, fmt.Errorf("unknown state %q", config.State)
 }
 
-// func (f *Fs) findObject(ctx context.Context, p string) (item *api.DriveItem, found bool, err error) {
-// 	service, _ := f.icloud.DriveService()
+// find item by path. Will not return any children for the item
+func (f *Fs) findItem(ctx context.Context, dir string) (item *api.DriveItem, found bool, err error) {
+	service, _ := f.icloud.DriveService()
 
-// 	// var item *api.DriveItem
-// 	var resp *http.Response
-// 	var resp *http.Response
-// 	if err = f.pacer.Call(func() (bool, error) {
-// 		item, resp, err = service.GetDocByPath(ctx, path.Join(f.root, p))
-// 		return shouldRetry(ctx, resp, err)
-// 	}); err != nil {
-// 		if item == nil && resp.StatusCode == 404 {
-// 			return nil, false, nil
-// 		}
-// 		return nil, false, err
-// 	}
-
-// 	return item, true, nil
-// }
+	// 	// var item *api.DriveItem
+	// 	var resp *http.Response
+	var resp *http.Response
+	if err = f.pacer.Call(func() (bool, error) {
+		item, resp, err = service.GetItemByPath(ctx, path.Join(f.root, dir))
+		return shouldRetry(ctx, resp, err)
+	}); err != nil {
+		if item == nil && resp.StatusCode == 404 {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	return item, true, nil
+}
 
 func (f *Fs) findLeafItem(ctx context.Context, pathID string, leaf string) (item *api.DriveItem, found bool, err error) {
 	//fmt.Println("FINDLEAFITEM", pathID, leaf)
@@ -282,6 +283,47 @@ func (f *Fs) Hashes() hash.Set {
 	return 0
 }
 
+func (f *Fs) purgeCheck(ctx context.Context, dir string, check bool) error {
+
+	directoryID, etag, err := f.FindDir(ctx, dir, false)
+	if err != nil {
+		return err
+	}
+
+	if directoryID == "" {
+		return fs.ErrorDirNotFound
+	}
+
+	if check {
+		item, found, err := f.findItem(ctx, dir)
+		if err != nil {
+			return err
+		}
+		if !found {
+			return fs.ErrorDirNotFound
+		}
+		if item.DirectChildrenCount > 0 {
+			return fs.ErrorDirectoryNotEmpty
+		}
+	}
+
+	service, _ := f.icloud.DriveService()
+
+	var _ *api.DriveItem
+	var resp *http.Response
+	if err = f.pacer.Call(func() (bool, error) {
+		_, resp, err = service.MoveItemToTrashByID(ctx, directoryID, etag, true)
+		return shouldRetry(ctx, resp, err)
+	}); err != nil {
+		return err
+	}
+
+	// flush everything from the left of the dir
+	f.dirCache.FlushDir(dir)
+
+	return nil
+}
+
 // func (f *Fs) CleanUp(ctx context.Context) error {
 // 	panic("unimplemented")
 // }
@@ -296,7 +338,7 @@ func (f *Fs) Purge(ctx context.Context, dir string) error {
 	if dir == "" {
 		return fs.ErrorCantPurge
 	}
-	return f.Rmdir(ctx, dir)
+	return f.purgeCheck(ctx, dir, false)
 }
 
 func (f *Fs) listAll(ctx context.Context, dirID string) (items []*api.DriveItem, err error) {
@@ -471,10 +513,6 @@ func (f *Fs) Put(ctx context.Context, in io.Reader, src fs.ObjectInfo, options .
 		return nil, errors.New("file size unknown")
 	}
 
-	if size == 0 {
-		return nil, fs.ErrorCantUploadEmptyFiles
-	}
-
 	existingObj, err := f.NewObject(ctx, src.Remote())
 	switch err {
 	case nil:
@@ -548,30 +586,7 @@ func (f *Fs) putFolderCache(id, etag, remote string) string {
 
 // Rmdir implements fs.Fs.
 func (f *Fs) Rmdir(ctx context.Context, dir string) error {
-	directoryID, etag, err := f.FindDir(ctx, dir, false)
-	if err != nil {
-		return err
-	}
-
-	if directoryID == "" {
-		return fs.ErrorDirNotFound
-	}
-
-	service, _ := f.icloud.DriveService()
-
-	var _ *api.DriveItem
-	var resp *http.Response
-	if err = f.pacer.Call(func() (bool, error) {
-		_, resp, err = service.MoveItemToTrashByID(ctx, directoryID, etag, true)
-		return shouldRetry(ctx, resp, err)
-	}); err != nil {
-		return err
-	}
-
-	// flush everything from the left of the dir
-	f.dirCache.FlushDir(dir)
-
-	return nil
+	return f.purgeCheck(ctx, dir, true)
 }
 
 // Root implements fs.Fs.
@@ -619,21 +634,19 @@ func (f *Fs) DirMove(ctx context.Context, src fs.Fs, srcRemote, dstRemote string
 		return fs.ErrorCantDirMove
 	}
 
-	dstLeaf, dstDirectoryID, _, err := f.FindPath(ctx, dstRemote, true)
+	srcID, jsrcDirectoryID, srcLeaf, jdstDirectoryID, dstLeaf, err := f.dirCache.DirMove(ctx, srcFs.dirCache, srcFs.root, srcRemote, f.root, dstRemote)
 	if err != nil {
 		return err
 	}
 
-	srcLeaf, srcDirectoryID, srcEtag, err := f.FindPath(ctx, srcRemote, true)
-	if err != nil {
-		return err
-	}
+	srcDirectoryID, srcEtag := f.parseNormalizedID(jsrcDirectoryID)
+	dstDirectoryID, _ := f.parseNormalizedID(jdstDirectoryID)
 
 	if srcDirectoryID == dstDirectoryID {
 		return fs.ErrorDirExists
 	}
 
-	_, err = f.move(ctx, srcDirectoryID, srcDirectoryID, srcLeaf, srcEtag, dstDirectoryID, dstLeaf)
+	_, err = f.move(ctx, srcID, srcDirectoryID, srcLeaf, srcEtag, dstDirectoryID, dstLeaf)
 	if err != nil {
 		return err
 	}
@@ -734,25 +747,25 @@ func ReadCookies(raw string) []*http.Cookie {
 	return request.Cookies()
 }
 
+var retryErrorCodes = []int{
+	408, // Request Timeout
+	409, // Conflict, retry could fix it.
+	429, // Rate exceeded.
+	500, // Get occasional 500 Internal Server Error
+	503, // Service Unavailable
+	504, // Gateway Time-out
+}
+
 func shouldRetry(ctx context.Context, resp *http.Response, err error) (bool, error) {
 	if fserrors.ContextError(ctx, &err) {
 		return false, err
 	}
 
-	if err == nil {
+	if err == nil && resp == nil {
 		return false, err
 	}
 
-	switch resp.StatusCode {
-	case 503:
-		fs.Debugf(nil, "Sleeping for 1 seconds due to: %v", err)
-		time.Sleep(1 * time.Second)
-		return true, err
-
-	default:
-	}
-
-	return false, err
+	return fserrors.ShouldRetry(err) || fserrors.ShouldRetryHTTP(resp, retryErrorCodes), err
 }
 
 // NewFs constructs an Fs from the path, container:path
@@ -940,6 +953,12 @@ func (o *Object) ModTime(context.Context) time.Time {
 // Open implements fs.Object.
 func (o *Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadCloser, error) {
 	fs.FixRangeOption(options, o.size)
+
+	// drive doesnt support empty files, so we cheat
+	if o.size == 0 {
+		return io.NopCloser(bytes.NewBufferString("")), nil
+	}
+
 	service, _ := o.fs.icloud.DriveService()
 	var resp *http.Response
 	var err error
@@ -1011,10 +1030,6 @@ func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, op
 	size := src.Size()
 	if size < 0 {
 		return errors.New("file size unknown")
-	}
-
-	if size == 0 {
-		return fs.ErrorCantUploadEmptyFiles
 	}
 
 	remote := o.Remote()

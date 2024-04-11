@@ -284,14 +284,14 @@ func (f *Fs) Hashes() hash.Set {
 }
 
 func (f *Fs) purgeCheck(ctx context.Context, dir string, check bool) error {
+	root := path.Join(f.root, dir)
+	if root == "" {
+		return errors.New("can't purge root directory")
+	}
 
 	directoryID, etag, err := f.FindDir(ctx, dir, false)
 	if err != nil {
 		return err
-	}
-
-	if directoryID == "" {
-		return fs.ErrorDirNotFound
 	}
 
 	if check {
@@ -299,10 +299,10 @@ func (f *Fs) purgeCheck(ctx context.Context, dir string, check bool) error {
 		if err != nil {
 			return err
 		}
-		if !found {
-			return fs.ErrorDirNotFound
-		}
-		if item.DirectChildrenCount > 0 {
+		// if !found {
+		// 	return fs.ErrorDirNotFound
+		// }
+		if found && item.DirectChildrenCount > 0 {
 			return fs.ErrorDirectoryNotEmpty
 		}
 	}
@@ -752,6 +752,7 @@ var retryErrorCodes = []int{
 	409, // Conflict, retry could fix it.
 	429, // Rate exceeded.
 	500, // Get occasional 500 Internal Server Error
+	502, // Server overload
 	503, // Service Unavailable
 	504, // Gateway Time-out
 }
@@ -963,7 +964,7 @@ func (o *Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadClo
 	var resp *http.Response
 	var err error
 	if err = o.fs.pacer.Call(func() (bool, error) {
-		resp, err = service.DownloadFile(ctx, o.id)
+		resp, err = service.DownloadFile(ctx, o.id, options)
 		return shouldRetry(ctx, resp, err)
 	}); err != nil {
 		return nil, err

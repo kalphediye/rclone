@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/rclone/rclone/fs"
 	"github.com/rclone/rclone/lib/rest"
 )
 
@@ -96,42 +97,48 @@ func (d *DriveService) GetItemsByDriveID(ctx context.Context, ids []string, incl
 
 func (d *DriveService) GetDocByPath(ctx context.Context, path string) (*Document, *http.Response, error) {
 	values := url.Values{}
-	values.Set("path", path)
 	values.Set("unified_format", "false")
+
+	body, _ := IntoReader(path)
+
 	opts := rest.Opts{
-		Method:       "GET",
+		Method:       "POST",
 		Path:         "/ws/" + defaultZone + "/list/lookup_by_path",
 		ExtraHeaders: d.icloud.Session.GetHeaders(map[string]string{}),
 		RootURL:      d.docsEndpoint,
 		Parameters:   values,
+		Body:         body,
 	}
-	var item *Document
+	var item []*Document
 	resp, err := d.icloud.Session.Request(ctx, opts, nil, &item)
 	if err != nil {
 		return nil, resp, err
 	}
 
-	return item, resp, err
+	return item[0], resp, err
 }
 
 func (d *DriveService) GetItemByPath(ctx context.Context, path string) (*DriveItem, *http.Response, error) {
 	values := url.Values{}
-	values.Set("path", path)
 	values.Set("unified_format", "true")
+
+	body, _ := IntoReader(path)
+
 	opts := rest.Opts{
-		Method:       "GET",
+		Method:       "POST",
 		Path:         "/ws/" + defaultZone + "/list/lookup_by_path",
 		ExtraHeaders: d.icloud.Session.GetHeaders(map[string]string{}),
 		RootURL:      d.docsEndpoint,
 		Parameters:   values,
+		Body:         body,
 	}
-	var item *DriveItem
+	var item []*DriveItem
 	resp, err := d.icloud.Session.Request(ctx, opts, nil, &item)
 	if err != nil {
 		return nil, resp, err
 	}
 
-	return item, resp, err
+	return item[0], resp, err
 }
 
 func (d *DriveService) GetDocByItemID(ctx context.Context, id string) (*Document, *http.Response, error) {
@@ -154,7 +161,7 @@ func (d *DriveService) GetDocByItemID(ctx context.Context, id string) (*Document
 	return item, resp, err
 }
 
-func (d *DriveService) DownloadFile(ctx context.Context, id string) (*http.Response, error) {
+func (d *DriveService) DownloadFile(ctx context.Context, id string, opt []fs.OpenOption) (*http.Response, error) {
 	_, zone, docid := DeconstructDriveID(id)
 	values := url.Values{}
 	values.Set("document_id", docid)
@@ -183,6 +190,7 @@ func (d *DriveService) DownloadFile(ctx context.Context, id string) (*http.Respo
 			Method:       "GET",
 			ExtraHeaders: d.icloud.Session.GetHeaders(map[string]string{}),
 			RootURL:      url,
+			Options:      opt,
 		}
 		return d.icloud.srv.Call(ctx, opts)
 	}

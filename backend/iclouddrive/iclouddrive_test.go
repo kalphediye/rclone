@@ -1,16 +1,16 @@
-package icloud_test
+package iclouddrive_test
 
 import (
 	"testing"
 
-	"github.com/rclone/rclone/backend/icloud"
+	iclouddrive "github.com/rclone/rclone/backend/iclouddrive"
 	"github.com/rclone/rclone/fstest/fstests"
 )
 
 // TestIntegration runs integration tests against the remote
 func TestIntegration(t *testing.T) {
 	fstests.Run(t, &fstests.Opt{
-		RemoteName: "TestICloud:",
-		NilObject:  (*icloud.Object)(nil),
+		RemoteName: "TestICloudDrive:",
+		NilObject:  (*iclouddrive.Object)(nil),
 	})
 }

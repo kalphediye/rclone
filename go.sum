@@ -460,6 +460,10 @@ github.com/rclone/gofakes3 v0.0.3-0.20240413163749-372c3e746e45 h1:qrH/G7j3Ru2E6
 github.com/rclone/gofakes3 v0.0.3-0.20240413163749-372c3e746e45/go.mod h1:L0VIBE0mT6ArN/5dfHsJm3UjqCpi5B/cdN+qWDNh7ko=
 github.com/rclone/gofakes3 v0.0.3-0.20240413171058-b7a9fdb78ddb h1:HJJ7XgRBfXew3EosVk45aGPJRY5wSTSpmAJqz8Kiw0w=
 github.com/rclone/gofakes3 v0.0.3-0.20240413171058-b7a9fdb78ddb/go.mod h1:L0VIBE0mT6ArN/5dfHsJm3UjqCpi5B/cdN+qWDNh7ko=
+github.com/rclone/gofakes3 v0.0.3-0.20240414171457-6975bf40a0a8 h1:hJNS/Xf4iQD/Et/pOVuYtJE9zbEZ01MeQM10Xa3xf+k=
+github.com/rclone/gofakes3 v0.0.3-0.20240414171457-6975bf40a0a8/go.mod h1:L0VIBE0mT6ArN/5dfHsJm3UjqCpi5B/cdN+qWDNh7ko=
+github.com/rclone/gofakes3 v0.0.3-0.20240422160309-90e8e825c0c3 h1:PyMsWM61oBPU3ajQfCImfxPHyESb5wC6NaZ6b2GAXTo=
+github.com/rclone/gofakes3 v0.0.3-0.20240422160309-90e8e825c0c3/go.mod h1:L0VIBE0mT6ArN/5dfHsJm3UjqCpi5B/cdN+qWDNh7ko=
 github.com/relvacode/iso8601 v1.3.0 h1:HguUjsGpIMh/zsTczGN3DVJFxTU/GX+MMmzcKoMO7ko=
 github.com/relvacode/iso8601 v1.3.0/go.mod h1:FlNp+jz+TXpyRqgmM7tnzHHzBnz776kmAH2h3sZCn0I=
 github.com/rfjakob/eme v1.1.2 h1:SxziR8msSOElPayZNFfQw4Tjx/Sbaeeh3eRvrHVMUs4=

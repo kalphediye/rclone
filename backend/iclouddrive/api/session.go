@@ -71,7 +71,6 @@ func (s *Session) Load() (*Session, error) {
 func (s *Session) Request(ctx context.Context, opts rest.Opts, request interface{}, response interface{}) (*http.Response, error) {
 	resp, err := s.srv.CallJSON(ctx, &opts, &request, &response)
 
-	// fmt.Printf("%s", prettyPrint(resp.Request.Header))
 	if err != nil {
 		return resp, fmt.Errorf("%s %s failed, status %d, err: %s", opts.Method, resp.Request.URL, resp.StatusCode, err)
 	}

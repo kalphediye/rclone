@@ -119,9 +119,10 @@ type Object struct {
 	modTime     time.Time // modification time of the object
 	createdTime time.Time // creation time of the object
 	id          string    // drive ID of the object
-	docId       string    // document ID of the object
-	itemId      string    // item ID of the object
+	// docId       string    // document ID of the object
+	itemId      string // item ID of the object
 	etag        string
+	downloadUrl string
 }
 
 func Config(ctx context.Context, name string, m configmap.Mapper, config fs.ConfigIn) (*fs.ConfigOut, error) {
@@ -219,38 +220,13 @@ func (f *Fs) findItem(ctx context.Context, dir string) (item *api.DriveItem, fou
 }
 
 func (f *Fs) findLeafItem(ctx context.Context, pathID string, leaf string) (item *api.DriveItem, found bool, err error) {
-	//fmt.Println("FINDLEAFITEM", pathID, leaf)
-
-	// var path string
-	// if pathID == f.rootID { // root?
-	// 	path = leaf
-	// } else {
-	// 	fmt.Print(f.dirCache.String())
-	// 	dir, _ := f.dirCache.FindDir(ctx, pathID, false)
-	// 	path = dir + "/" + leaf
-	// }
-	// service, _ := f.icloud.DriveService()
-
-	// // var item *api.DriveItem
-	// var resp *http.Response
-	// if err = f.pacer.Call(func() (bool, error) {
-	// 	item, resp, err = service.GetItemByPath(ctx, path)
-	// 	return shouldRetry(ctx, resp, err)
-	// }); err != nil {
-	// 	if item == nil && resp.StatusCode == 404 {
-	// 		return nil, false, nil
-	// 	}
-
-	// 	return nil, false, err
-	// }
-	// _, _ = f.dirCache.RootID(context.Background(), false)
-
 	items, _ := f.listAll(ctx, pathID)
 	for _, item := range items {
 		if strings.EqualFold(item.FullName(), leaf) {
 			return item, true, nil
 		}
 	}
+
 	return nil, false, nil
 
 }
@@ -270,7 +246,7 @@ func (f *Fs) FindLeaf(ctx context.Context, pathID string, leaf string) (pathIDOu
 		return "", false, fs.ErrorIsFile
 	}
 
-	return f.IDJoin(item.Drivewsid, item.Etag), true, nil
+	return f.IDJoin(item.Itemid, item.Etag), true, nil
 }
 
 // Features implements fs.Fs.
@@ -312,7 +288,7 @@ func (f *Fs) purgeCheck(ctx context.Context, dir string, check bool) error {
 	var _ *api.DriveItem
 	var resp *http.Response
 	if err = f.pacer.Call(func() (bool, error) {
-		_, resp, err = service.MoveItemToTrashByID(ctx, directoryID, etag, true)
+		_, resp, err = service.MoveItemToTrashByItemID(ctx, directoryID, etag, true)
 		return shouldRetry(ctx, resp, err)
 	}); err != nil {
 		return err
@@ -343,17 +319,19 @@ func (f *Fs) Purge(ctx context.Context, dir string) error {
 
 func (f *Fs) listAll(ctx context.Context, dirID string) (items []*api.DriveItem, err error) {
 	service, _ := f.icloud.DriveService()
-	var item *api.DriveItem
+	var itemsRaw []*api.DriveItemRaw
 	var resp *http.Response
 	if err = f.pacer.Call(func() (bool, error) {
 		id, _ := f.parseNormalizedID(dirID)
-		item, resp, err = service.GetItemByDriveID(ctx, id, true)
+		itemsRaw, resp, err = service.GetItemsInFolder(ctx, id, 100000)
 		return shouldRetry(ctx, resp, err)
 	}); err != nil {
 		return nil, err
 	}
 
-	for _, item := range item.Items {
+	// var driveItems []*api.DriveItemRaw
+	for _, i := range itemsRaw {
+		item := i.IntoDriveItem()
 		item.Name = f.opt.Enc.ToStandardName(item.Name)
 		item.Extension = f.opt.Enc.ToStandardName(item.Extension)
 		items = append(items, item)
@@ -373,7 +351,7 @@ func (f *Fs) List(ctx context.Context, dir string) (entries fs.DirEntries, err e
 	items, _ := f.listAll(ctx, dirRemoteID)
 
 	for _, item := range items {
-		id := item.Drivewsid
+		id := item.Itemid
 		name := item.FullName()
 		remote := path.Join(dir, name)
 		if item.IsFolder() {
@@ -435,11 +413,11 @@ func (f *Fs) Copy(ctx context.Context, src fs.Object, remote string) (fs.Object,
 
 	service, _ := f.icloud.DriveService()
 	var resp *http.Response
-	var info *api.CopyResponse
+	var info *api.DriveItemRaw
 	//var item *api.DriveItem
 	// var err error
 	if err = f.pacer.Call(func() (bool, error) {
-		info, resp, err = service.CopyDocByItemID(ctx, srcObj.itemId)
+		info, resp, err = service.CopyDocByItemID(ctx, srcObj.id)
 		return shouldRetry(ctx, resp, err)
 	}); err != nil {
 		return nil, err
@@ -610,13 +588,13 @@ func (f *Fs) CreateDir(ctx context.Context, pathID, leaf string) (string, error)
 	var resp *http.Response
 	if err = f.pacer.Call(func() (bool, error) {
 		id, _ := f.parseNormalizedID(pathID)
-		item, resp, err = service.CreateNewFolderByID(ctx, id, f.opt.Enc.FromStandardName(leaf))
+		item, resp, err = service.CreateNewFolderByItemID(ctx, id, f.opt.Enc.FromStandardName(leaf))
 		return shouldRetry(ctx, resp, err)
 	}); err != nil {
 		return "", err
 	}
 
-	return f.IDJoin(item.Drivewsid, item.Etag), err
+	return f.IDJoin(item.Itemid, item.Etag), err
 }
 
 // DirMove moves src, srcRemote to this remote at dstRemote
@@ -813,7 +791,8 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 		name:   name,
 		root:   root,
 		icloud: icloud,
-		rootID: "FOLDER::com.apple.CloudDocs::root",
+		// rootID: "FOLDER::com.apple.CloudDocs::root",
+		rootID: "root",
 		opt:    *opt,
 		pacer:  fs.NewPacer(ctx, pacer.NewDefault(pacer.MinSleep(minSleep), pacer.MaxSleep(maxSleep), pacer.DecayConstant(decayConstant))),
 	}
@@ -893,7 +872,6 @@ func (f *Fs) NewObjectFromDriveItem(ctx context.Context, remote string, item *ap
 }
 
 func (f *Fs) readMetaData(ctx context.Context, path string) (item *api.DriveItem, err error) {
-	// _, _, _ = f.findObject(ctx, path)
 	leaf, ID, _, err := f.FindPath(ctx, path, false)
 
 	if err != nil {
@@ -923,11 +901,13 @@ func (o *Object) setMetaData(item *api.DriveItem) (err error) {
 	o.size = item.Size
 	o.modTime = item.DateModified
 	o.createdTime = item.DateCreated
-	o.id = item.Drivewsid
+	// we use the item id.
+	o.id = item.Itemid
 	o.itemId = item.Itemid
 	//o.id = o.fs.IDJoin(item.Drivewsid, item.Etag)
-	o.docId = item.Docwsid
+	//o.docId = item.Docwsid
 	o.etag = item.Etag
+	o.downloadUrl = item.DownloadUrl()
 	return nil
 }
 
@@ -964,7 +944,13 @@ func (o *Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadClo
 	var resp *http.Response
 	var err error
 	if err = o.fs.pacer.Call(func() (bool, error) {
-		resp, err = service.DownloadFile(ctx, o.id, options)
+		// if o.downloadUrl == "" {
+		// 	o.downloadUrl, _, err = service.GetDownloadURL(ctx, o.id)
+		// 	if err != nil {
+		// 		return nil, err
+		// 	}
+		// }
+		resp, err = service.DownloadFile(ctx, o.downloadUrl, options)
 		return shouldRetry(ctx, resp, err)
 	}); err != nil {
 		return nil, err
@@ -989,7 +975,7 @@ func (o *Object) Remove(ctx context.Context) error {
 	var resp *http.Response
 	var err error
 	if err = o.fs.pacer.Call(func() (bool, error) {
-		_, resp, err = service.MoveItemToTrashByID(ctx, o.id, o.etag, true)
+		_, resp, err = service.MoveItemToTrashByItemID(ctx, o.itemId, o.etag, true)
 		return shouldRetry(ctx, resp, err)
 	}); err != nil {
 		return err
@@ -1044,22 +1030,25 @@ func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, op
 
 	// Move current file to trash
 	if o.id != "" {
-		_, _, _ = service.MoveItemToTrashByID(ctx, o.id, o.etag, true)
+		_, _, _ = service.MoveItemToTrashByItemID(ctx, o.id, o.etag, true)
 	}
 	var resp *http.Response
 	var item *api.DriveItem
 	if err = o.fs.pacer.Call(func() (bool, error) {
-		item, resp, err = service.UploadFile(ctx, in, size, o.fs.opt.Enc.FromStandardName(leaf), folderLinkID, modTime)
+		item, resp, err = service.UploadFileByItemID(ctx, in, size, o.fs.opt.Enc.FromStandardName(leaf), folderLinkID, modTime)
 		return shouldRetry(ctx, resp, err)
 	}); err != nil {
 		return err
 	}
 
-	o.setMetaData(item)
+	err = o.setMetaData(item)
+	if err != nil {
+		return err
+	}
+	// fmt.Println("YOO", o.remote)
 	o.modTime = modTime
 	o.size = src.Size()
 
-	//fs.Debugf(o, "DONE")
 	return nil
 }
 

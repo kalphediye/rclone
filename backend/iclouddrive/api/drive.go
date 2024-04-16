@@ -255,7 +255,7 @@ func (d *DriveService) MoveItemToTrashByItemID(ctx context.Context, id, etag str
 	if err != nil {
 		return nil, resp, err
 	}
-	return d.MoveItemToTrashByID(ctx, GetDriveIDFromDocID(doc.DocumentID, doc.Type), etag, force)
+	return d.MoveItemToTrashByID(ctx, doc.DriveID(), etag, force)
 }
 
 func (d *DriveService) MoveItemToTrashByID(ctx context.Context, drivewsid, etag string, force bool) (*DriveItem, *http.Response, error) {
@@ -339,7 +339,7 @@ func (d *DriveService) CreateNewFolderByItemID(ctx context.Context, id, name str
 	if err != nil {
 		return nil, resp, err
 	}
-	return d.CreateNewFolderByDriveID(ctx, GetDriveIDFromDocID(doc.DocumentID, doc.Type), name)
+	return d.CreateNewFolderByDriveID(ctx, doc.DriveID(), name)
 }
 
 func (d *DriveService) CreateNewFolderByDriveID(ctx context.Context, drivewsid, name string) (*DriveItem, *http.Response, error) {
@@ -370,18 +370,24 @@ func (d *DriveService) CreateNewFolderByDriveID(ctx context.Context, drivewsid, 
 	return fResp.Folders[0], resp, err
 }
 
-func (d *DriveService) RenameItemByID(ctx context.Context, drivewsid, etag, name string, force bool) (*DriveItem, *http.Response, error) {
+func (d *DriveService) RenameItemByItemID(ctx context.Context, id, etag, name string, force bool) (*DriveItem, *http.Response, error) {
+	doc, resp, err := d.GetDocByItemID(ctx, id)
+	if err != nil {
+		return nil, resp, err
+	}
+	return d.RenameItemByDriveID(ctx, doc.DriveID(), doc.Etag, name, force)
+}
+
+func (d *DriveService) RenameItemByDriveID(ctx context.Context, id, etag, name string, force bool) (*DriveItem, *http.Response, error) {
 	// split := strings.Split(name, ".")
 	values := map[string]any{
 		"items": []map[string]any{{
-			"drivewsid": drivewsid,
+			"drivewsid": id,
 			"name":      name,
 			"etag":      etag,
 			// "extension": split[1],
 		}},
 	}
-
-	//{"items":[{"drivewsid":"FILE::com.apple.CloudDocs::6F246527-504C-4073-BAF2-26C6DECE6CC0","etag":"3ne::3nd","name":"notes.staan","extension":"partial"}]}
 
 	body, _ := IntoReader(values)
 	opts := rest.Opts{
@@ -402,7 +408,7 @@ func (d *DriveService) RenameItemByID(ctx context.Context, drivewsid, etag, name
 	if status != statusOk {
 		// rerun with latest etag
 		if force && status == "ETAG_CONFLICT" {
-			return d.RenameItemByID(ctx, drivewsid, items.Items[0].Etag, name, false)
+			return d.RenameItemByDriveID(ctx, id, items.Items[0].Etag, name, false)
 		}
 
 		err = fmt.Errorf("%s %s failed, status %s", opts.Method, resp.Request.URL, status)
@@ -411,13 +417,25 @@ func (d *DriveService) RenameItemByID(ctx context.Context, drivewsid, etag, name
 	return items.Items[0], resp, err
 }
 
-func (d *DriveService) MoveItemByID(ctx context.Context, drivewsid, etag, dstDrivewsid string, force bool) (*DriveItem, *http.Response, error) {
+func (d *DriveService) MoveItemByItemID(ctx context.Context, id, etag, dstID string, force bool) (*DriveItem, *http.Response, error) {
+	docSrc, resp, err := d.GetDocByItemID(ctx, id)
+	if err != nil {
+		return nil, resp, err
+	}
+	docDst, resp, err := d.GetDocByItemID(ctx, dstID)
+	if err != nil {
+		return nil, resp, err
+	}
+	return d.MoveItemByDriveID(ctx, docSrc.DriveID(), docSrc.Etag, docDst.DriveID(), force)
+}
+
+func (d *DriveService) MoveItemByDriveID(ctx context.Context, id, etag, dstID string, force bool) (*DriveItem, *http.Response, error) {
 	values := map[string]any{
-		"destinationDrivewsId": dstDrivewsid,
+		"destinationDrivewsId": dstID,
 		"items": []map[string]any{{
-			"drivewsid": drivewsid,
+			"drivewsid": id,
 			"etag":      etag,
-			"clientId":  drivewsid,
+			"clientId":  id,
 		}},
 	}
 
@@ -441,7 +459,7 @@ func (d *DriveService) MoveItemByID(ctx context.Context, drivewsid, etag, dstDri
 	if status != statusOk {
 		// rerun with latest etag
 		if force && status == "ETAG_CONFLICT" {
-			return d.MoveItemByID(ctx, drivewsid, items.Items[0].Etag, dstDrivewsid, false)
+			return d.MoveItemByDriveID(ctx, id, items.Items[0].Etag, dstID, false)
 		}
 
 		err = fmt.Errorf("%s %s failed, status %s", opts.Method, resp.Request.URL, status)
@@ -508,7 +526,7 @@ func (d *DriveService) UploadFileByItemID(ctx context.Context, in io.Reader, siz
 	if err != nil {
 		return nil, resp, err
 	}
-	return d.UploadFile(ctx, in, size, name, GetDriveIDFromDocID(doc.DocumentID, doc.Type), mTime)
+	return d.UploadFile(ctx, in, size, name, doc.DriveID(), mTime)
 }
 
 func (d *DriveService) UploadFile(ctx context.Context, in io.Reader, size int64, name, folderDriveID string, mTime time.Time) (*DriveItem, *http.Response, error) {
@@ -806,6 +824,10 @@ type Document struct {
 	HasChainedParent bool        `json:"hasChainedParent"`
 }
 
+func (d *Document) DriveID() string {
+	return d.Type + "::" + defaultZone + "::" + d.DocumentID
+}
+
 type DocumentData struct {
 	Signature          string `json:"signature"`
 	Owner              string `json:"owner"`
@@ -898,9 +920,9 @@ func (d *DriveItem) FullName() string {
 	return d.Name
 }
 
-func GetDriveIDFromDocID(id, t string) string {
-	return t + "::" + defaultZone + "::" + id
-}
+//func GetDriveIDFromDocID(id, t string) string {
+//	return t + "::" + defaultZone + "::" + id
+//}
 
 func GetDocIDFromDriveID(id string) string {
 	split := strings.Split(id, "::")

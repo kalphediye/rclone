@@ -433,13 +433,24 @@ func (f *Fs) Copy(ctx context.Context, src fs.Object, remote string) (fs.Object,
 	}); err != nil {
 		return nil, err
 	}
+	//fmt.Println("YO", doc.ParentID)
+
+	// get parentdrive id
+	var dirDoc *api.Document
+	if err = f.pacer.Call(func() (bool, error) {
+		dirDoc, resp, err = service.GetDocByItemID(ctx, pathID)
+		return shouldRetry(ctx, resp, err)
+	}); err != nil {
+		return nil, err
+	}
 
 	// build request
-	_, _, StartingDocumentID := api.DeconstructDriveID(pathID)
+
+	//_, _, StartingDocumentID := api.DeconstructDriveID(pathID)
 	r := api.NewUpdateFileInfo()
 	r.DocumentID = doc.DocumentID
 	r.Path.Path = file
-	r.Path.StartingDocumentID = StartingDocumentID
+	r.Path.StartingDocumentID = dirDoc.DocumentID
 	r.Data.Signature = doc.Data.Signature
 	r.Data.ReferenceSignature = doc.Data.ReferenceSignature
 	r.Data.WrappingKey = doc.Data.WrappingKey
@@ -645,21 +656,29 @@ func (f *Fs) move(ctx context.Context, ID, srcDirectoryID, srcLeaf, srcEtag, dst
 	if srcDirectoryID != dstDirectoryID {
 		if err = f.pacer.Call(func() (bool, error) {
 			id, _ := f.parseNormalizedID(ID)
-			item, resp, err = service.MoveItemByID(ctx, id, srcEtag, dstDirectoryID, true)
+			item, resp, err = service.MoveItemByItemID(ctx, id, srcEtag, dstDirectoryID, true)
 			return shouldRetry(ctx, resp, err)
 		}); err != nil {
 			return nil, err
 		}
 
-		// also gotta rename
+		// also gotta rename, dont do recursive as we no have the drive ID
 		if srcLeaf != dstLeaf {
-			return f.move(ctx, ID, item.ParentID, srcLeaf, item.Etag, dstDirectoryID, dstLeaf)
+			//return f.move(ctx, ID, item.ParentID, srcLeaf, item.Etag, dstDirectoryID, dstLeaf)
+			if err = f.pacer.Call(func() (bool, error) {
+				item, resp, err = service.RenameItemByDriveID(ctx, item.Drivewsid, item.Etag, dstLeaf, true)
+				return shouldRetry(ctx, resp, err)
+			}); err != nil {
+				return item, err
+			}
+			return item, nil
+
 		}
 		// rename
 	} else if srcDirectoryID == dstDirectoryID && srcLeaf != dstLeaf {
 		if err = f.pacer.Call(func() (bool, error) {
 			id, _ := f.parseNormalizedID(ID)
-			item, resp, err = service.RenameItemByID(ctx, id, srcEtag, dstLeaf, true)
+			item, resp, err = service.RenameItemByItemID(ctx, id, srcEtag, dstLeaf, true)
 			return shouldRetry(ctx, resp, err)
 		}); err != nil {
 			return item, err

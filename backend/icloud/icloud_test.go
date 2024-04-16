@@ -3,6 +3,7 @@ package icloud_test
 import (
 	"testing"
 
+	"github.com/rclone/rclone/backend/icloud"
 	"github.com/rclone/rclone/fstest/fstests"
 )
 

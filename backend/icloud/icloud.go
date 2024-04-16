@@ -1,5 +1,5 @@
-// Package iclouddrive implements the iCloud Drive backend
-package iclouddrive
+// Package icloud implements the iCloud Drive backend
+package icloud
 
 import (
 	"bytes"
@@ -21,7 +21,7 @@ import (
 	"github.com/rclone/rclone/fs/config/obscure"
 	"github.com/rclone/rclone/fs/fserrors"
 
-	"github.com/rclone/rclone/backend/iclouddrive/api"
+	"github.com/rclone/rclone/backend/icloud/api"
 	"github.com/rclone/rclone/fs/hash"
 	"github.com/rclone/rclone/lib/dircache"
 	"github.com/rclone/rclone/lib/encoder"

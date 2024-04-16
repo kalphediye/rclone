@@ -1,9 +1,8 @@
-package iclouddrive_test
+package icloud_test
 
 import (
 	"testing"
 
-	iclouddrive "github.com/rclone/rclone/backend/iclouddrive"
 	"github.com/rclone/rclone/fstest/fstests"
 )
 
@@ -11,6 +10,6 @@ import (
 func TestIntegration(t *testing.T) {
 	fstests.Run(t, &fstests.Opt{
 		RemoteName: "TestICloudDrive:",
-		NilObject:  (*iclouddrive.Object)(nil),
+		NilObject:  (*icloud.Object)(nil),
 	})
 }

@@ -77,7 +77,7 @@ func init() {
 			Name:      configCookies,
 			Help:      "cookies (internal use only)",
 			Required:  false,
-			Advanced:  true,
+			Advanced:  false,
 			Sensitive: true,
 			Hide:      fs.OptionHideBoth,
 		}, {
@@ -1008,7 +1008,40 @@ func (o *Object) Remove(ctx context.Context) error {
 
 // SetModTime implements fs.Object.
 func (o *Object) SetModTime(ctx context.Context, t time.Time) error {
-	return fs.ErrorCantSetModTime
+	service, _ := o.fs.icloud.DriveService()
+
+	var doc *api.Document
+	var resp *http.Response
+	var err error
+	if err = o.fs.pacer.Call(func() (bool, error) {
+		doc, resp, err = service.GetDocByItemID(ctx, o.id)
+		return shouldRetry(ctx, resp, err)
+	}); err != nil {
+		return err
+	}
+
+	// build request
+
+	//_, _, StartingDocumentID := api.DeconstructDriveID(pathID)
+	r := api.NewUpdateFileInfo()
+	r.DocumentID = doc.DocumentID
+	//r.Path.Path = file
+	//r.Path.StartingDocumentID = dirDoc.DocumentID
+	//r.Data.Signature = doc.Data.Signature
+	//r.Data.ReferenceSignature = doc.Data.ReferenceSignature
+	//r.Data.WrappingKey = doc.Data.WrappingKey
+	//r.Data.Size = doc.Data.Size
+	r.Mtime = t.Unix() * 1000
+	//r.Btime = srcObj.modTime.Unix() * 1000
+
+	//var item *api.DriveItem
+	if err = o.fs.pacer.Call(func() (bool, error) {
+		_, resp, err = service.UpdateFile(ctx, &r)
+		return shouldRetry(ctx, resp, err)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Size implements fs.Object.

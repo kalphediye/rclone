@@ -530,6 +530,50 @@ func (f *Fs) DirCacheFlush() {
 	f.dirCache.ResetRoot()
 }
 
+// SetModTime implements fs.Object.
+func (f *Fs) setModTime(ctx context.Context, itemId string, t time.Time) error {
+	service, _ := f.icloud.DriveService()
+
+	var doc *api.Document
+	var resp *http.Response
+	var err error
+	if err = f.pacer.Call(func() (bool, error) {
+		doc, resp, err = service.GetDocByItemID(ctx, itemId)
+		return shouldRetry(ctx, resp, err)
+	}); err != nil {
+		return err
+	}
+
+	// build request
+
+	//_, _, StartingDocumentID := api.DeconstructDriveID(pathID)
+	r := api.NewUpdateFileInfo()
+	r.DocumentID = doc.DocumentID
+	//r.Path.Path = file
+	//r.Path.StartingDocumentID = dirDoc.DocumentID
+	//r.Data.Signature = doc.Data.Signature
+	//r.Data.ReferenceSignature = doc.Data.ReferenceSignature
+	//r.Data.WrappingKey = doc.Data.WrappingKey
+	//r.Data.Size = doc.Data.Size
+	r.Mtime = t.Unix() * 1000
+	//r.Btime = srcObj.modTime.Unix() * 1000
+
+	//var item *api.DriveItem
+	if err = f.pacer.Call(func() (bool, error) {
+		_, resp, err = service.UpdateFile(ctx, &r)
+		return shouldRetry(ctx, resp, err)
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+// DirSetModTime sets the directory modtime for dir
+//func (f *Fs) DirSetModTime(ctx context.Context, dir string, modTime time.Time) error {
+//	itemId, _, _ := f.FindDir(ctx, dir, false)
+//	return f.setModTime(ctx, itemId, modTime)
+//}
+
 func (f *Fs) parseNormalizedID(rid string) (id string, etag string) {
 	split := strings.Split(rid, "#")
 	if len(split) == 1 {
@@ -1008,40 +1052,8 @@ func (o *Object) Remove(ctx context.Context) error {
 
 // SetModTime implements fs.Object.
 func (o *Object) SetModTime(ctx context.Context, t time.Time) error {
-	service, _ := o.fs.icloud.DriveService()
-
-	var doc *api.Document
-	var resp *http.Response
-	var err error
-	if err = o.fs.pacer.Call(func() (bool, error) {
-		doc, resp, err = service.GetDocByItemID(ctx, o.id)
-		return shouldRetry(ctx, resp, err)
-	}); err != nil {
-		return err
-	}
-
-	// build request
-
-	//_, _, StartingDocumentID := api.DeconstructDriveID(pathID)
-	r := api.NewUpdateFileInfo()
-	r.DocumentID = doc.DocumentID
-	//r.Path.Path = file
-	//r.Path.StartingDocumentID = dirDoc.DocumentID
-	//r.Data.Signature = doc.Data.Signature
-	//r.Data.ReferenceSignature = doc.Data.ReferenceSignature
-	//r.Data.WrappingKey = doc.Data.WrappingKey
-	//r.Data.Size = doc.Data.Size
-	r.Mtime = t.Unix() * 1000
-	//r.Btime = srcObj.modTime.Unix() * 1000
-
-	//var item *api.DriveItem
-	if err = o.fs.pacer.Call(func() (bool, error) {
-		_, resp, err = service.UpdateFile(ctx, &r)
-		return shouldRetry(ctx, resp, err)
-	}); err != nil {
-		return err
-	}
-	return nil
+  return fs.ErrorCantSetModTime
+  //return o.fs.setModTime(ctx, o.id, t)
 }
 
 // Size implements fs.Object.

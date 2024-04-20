@@ -69,3 +69,7 @@ e) Edit this remote
 d) Delete this remote
 y/e/d> y
 ```
+
+## Advanced Data Protection
+
+ADP is currently unsupported and need to be disabled

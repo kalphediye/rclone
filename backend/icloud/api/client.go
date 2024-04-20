@@ -61,7 +61,7 @@ func (c *Client) Request(ctx context.Context, opts rest.Opts, request interface{
 	resp, err = c.Session.Request(ctx, opts, request, response)
 	if err != nil {
 		// try to reauth
-		if resp.StatusCode == 401 {
+		if resp.StatusCode == 401 && c.Session.TrustToken != "" {
 			err = c.Authenticate(ctx)
 			if err != nil {
 				return nil, err

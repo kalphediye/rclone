@@ -83,7 +83,7 @@ func (d *DriveService) GetItemsByDriveID(ctx context.Context, ids []string, incl
 		Body:         body,
 	}
 	var items []*DriveItem
-	resp, err := d.icloud.Session.Request(ctx, opts, nil, &items)
+	resp, err := d.icloud.Request(ctx, opts, nil, &items)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -110,7 +110,7 @@ func (d *DriveService) GetDocByPath(ctx context.Context, path string) (*Document
 		Body:         body,
 	}
 	var item []*Document
-	resp, err := d.icloud.Session.Request(ctx, opts, nil, &item)
+	resp, err := d.icloud.Request(ctx, opts, nil, &item)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -133,7 +133,7 @@ func (d *DriveService) GetItemByPath(ctx context.Context, path string) (*DriveIt
 		Body:         body,
 	}
 	var item []*DriveItem
-	resp, err := d.icloud.Session.Request(ctx, opts, nil, &item)
+	resp, err := d.icloud.Request(ctx, opts, nil, &item)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -153,7 +153,7 @@ func (d *DriveService) GetDocByItemID(ctx context.Context, id string) (*Document
 		Parameters:   values,
 	}
 	var item *Document
-	resp, err := d.icloud.Session.Request(ctx, opts, nil, &item)
+	resp, err := d.icloud.Request(ctx, opts, nil, &item)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -169,7 +169,7 @@ func (d *DriveService) GetItemRawByItemID(ctx context.Context, id string) (*Driv
 		RootURL:      d.docsEndpoint,
 	}
 	var item *DriveItemRaw
-	resp, err := d.icloud.Session.Request(ctx, opts, nil, &item)
+	resp, err := d.icloud.Request(ctx, opts, nil, &item)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -193,7 +193,7 @@ func (d *DriveService) GetItemsInFolder(ctx context.Context, id string, limit in
 		Items []*DriveItemRaw `json:"drive_item"`
 	}{}
 
-	resp, err := d.icloud.Session.Request(ctx, opts, nil, &items)
+	resp, err := d.icloud.Request(ctx, opts, nil, &items)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -206,7 +206,7 @@ func (d *DriveService) GetDownloadURL(ctx context.Context, id string) (string, *
 	values := url.Values{}
 	values.Set("document_id", docid)
 
-	opts := &rest.Opts{
+	opts := rest.Opts{
 		Method:       "GET",
 		Path:         "/ws/" + zone + "/download/by_id",
 		Parameters:   values,
@@ -215,7 +215,7 @@ func (d *DriveService) GetDownloadURL(ctx context.Context, id string) (string, *
 	}
 
 	var filer *FileRequest
-	resp, err := d.icloud.srv.CallJSON(ctx, opts, nil, &filer)
+	resp, err := d.icloud.Request(ctx, opts, nil, &filer)
 
 	var url string
 	if filer.DataToken != nil {
@@ -278,7 +278,7 @@ func (d *DriveService) MoveItemToTrashByID(ctx context.Context, drivewsid, etag 
 	item := struct {
 		Items []*DriveItem `json:"items"`
 	}{}
-	resp, err := d.icloud.Session.Request(ctx, opts, nil, &item)
+	resp, err := d.icloud.Request(ctx, opts, nil, &item)
 
 	if err != nil {
 		return nil, resp, err
@@ -360,7 +360,7 @@ func (d *DriveService) CreateNewFolderByDriveID(ctx context.Context, drivewsid, 
 		Body:         body,
 	}
 	var fResp *CreateFoldersResponse
-	resp, err := d.icloud.Session.Request(ctx, opts, nil, &fResp)
+	resp, err := d.icloud.Request(ctx, opts, nil, &fResp)
 
 	status := fResp.Folders[0].Status
 	if status != statusOk {
@@ -398,7 +398,7 @@ func (d *DriveService) RenameItemByDriveID(ctx context.Context, id, etag, name s
 		Body:         body,
 	}
 	var items *DriveItem
-	resp, err := d.icloud.Session.Request(ctx, opts, nil, &items)
+	resp, err := d.icloud.Request(ctx, opts, nil, &items)
 
 	if err != nil {
 		return nil, resp, err
@@ -449,7 +449,7 @@ func (d *DriveService) MoveItemByDriveID(ctx context.Context, id, etag, dstID st
 	}
 
 	var items *DriveItem
-	resp, err := d.icloud.Session.Request(ctx, opts, nil, &items)
+	resp, err := d.icloud.Request(ctx, opts, nil, &items)
 
 	if err != nil {
 		return nil, resp, err
@@ -514,7 +514,7 @@ func (d *DriveService) CopyDocByItemID(ctx context.Context, itemId string) (*Dri
 	}
 
 	var info *DriveItemRaw
-	resp, err := d.icloud.Session.Request(ctx, opts, nil, &info)
+	resp, err := d.icloud.Request(ctx, opts, nil, &info)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -552,7 +552,7 @@ func (d *DriveService) UploadFile(ctx context.Context, in io.Reader, size int64,
 		Body:         body,
 	}
 	var responseInfo []*UploadResponse
-	resp, err := d.icloud.srv.CallJSON(ctx, &opts, nil, &responseInfo)
+	resp, err := d.icloud.Request(ctx, opts, nil, &responseInfo)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -569,7 +569,7 @@ func (d *DriveService) UploadFile(ctx context.Context, in io.Reader, size int64,
 		MultipartFileName: name,
 	}
 	var singleFileResponse *SingleFileResponse
-	resp, err = d.icloud.srv.CallJSON(ctx, &opts, nil, &singleFileResponse)
+	resp, err = d.icloud.Request(ctx, opts, nil, &singleFileResponse)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -633,7 +633,7 @@ func (d *DriveService) UpdateFile(ctx context.Context, r *UpdateFileInfo) (*Driv
 		Body:         body,
 	}
 	var responseInfo *DocumentUpdateResponse
-	resp, err := d.icloud.srv.CallJSON(ctx, &opts, nil, &responseInfo)
+	resp, err := d.icloud.Request(ctx, opts, nil, &responseInfo)
 	if err != nil {
 		return nil, resp, err
 	}

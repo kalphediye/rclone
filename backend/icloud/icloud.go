@@ -126,8 +126,6 @@ type Object struct {
 }
 
 func Config(ctx context.Context, name string, m configmap.Mapper, config fs.ConfigIn) (*fs.ConfigOut, error) {
-	// var session *Session
-
 	appleid, _ := m.Get(configAppleID)
 	if appleid == "" {
 		return nil, errors.New("a apple ID is required")
@@ -160,7 +158,7 @@ func Config(ctx context.Context, name string, m configmap.Mapper, config fs.Conf
 		m.Set(configPassword, obscure.MustObscure(password))
 		return fs.ConfigGoto("authenticate")
 	case "authenticate":
-		icloud, _ := api.New(appleid, password, trustToken, cookies)
+		icloud, _ := api.New(appleid, password, trustToken, cookies, nil)
 		if err := icloud.Authenticate(ctx); err != nil {
 			return nil, err
 		}
@@ -175,18 +173,15 @@ func Config(ctx context.Context, name string, m configmap.Mapper, config fs.Conf
 			return fs.ConfigError("authenticate", "2FA codes can't be blank")
 		}
 
-		icloud, _ := api.New(appleid, password, trustToken, cookies)
+		icloud, _ := api.New(appleid, password, trustToken, cookies, nil)
 		if err := icloud.SignIn(ctx); err != nil {
 			return nil, err
 		}
-		//icloud.Session.Load()
+
 		if err := icloud.Session.Validate2FACode(ctx, code); err != nil {
 			return nil, err
 		}
 
-		// if err := session.validateSession(ctx, srv); err != nil {
-		// 	return nil, err
-		// }
 		m.Set(configTrustToken, icloud.Session.TrustToken)
 		m.Set(configCookies, icloud.Session.GetCookieString())
 		return nil, nil
@@ -204,8 +199,6 @@ func Config(ctx context.Context, name string, m configmap.Mapper, config fs.Conf
 func (f *Fs) findItem(ctx context.Context, dir string) (item *api.DriveItem, found bool, err error) {
 	service, _ := f.icloud.DriveService()
 
-	// 	// var item *api.DriveItem
-	// 	var resp *http.Response
 	var resp *http.Response
 	if err = f.pacer.Call(func() (bool, error) {
 		item, resp, err = service.GetItemByPath(ctx, path.Join(f.root, dir))
@@ -837,14 +830,18 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 
 	cookies := ReadCookies(opt.Cookies)
 
+	callback := func(session *api.Session) {
+		m.Set(configCookies, session.GetCookieString())
+	}
+
 	icloud, _ := api.New(
 		opt.AppleID,
 		opt.Password,
 		opt.TrustToken,
 		cookies,
+		callback,
 	)
 
-	// todo: save cookies if it reauths
 	if err := icloud.Authenticate(ctx); err != nil {
 		return nil, err
 	}
@@ -1052,8 +1049,8 @@ func (o *Object) Remove(ctx context.Context) error {
 
 // SetModTime implements fs.Object.
 func (o *Object) SetModTime(ctx context.Context, t time.Time) error {
-  return fs.ErrorCantSetModTime
-  //return o.fs.setModTime(ctx, o.id, t)
+	return fs.ErrorCantSetModTime
+	//return o.fs.setModTime(ctx, o.id, t)
 }
 
 // Size implements fs.Object.

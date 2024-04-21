@@ -92,6 +92,7 @@ func init() {
 	})
 }
 
+// Options defines the configuration for this backend
 type Options struct {
 	AppleID    string               `config:"apple_id"`
 	Password   string               `config:"password"`
@@ -101,6 +102,7 @@ type Options struct {
 	Enc        encoder.MultiEncoder `config:"encoding"`
 }
 
+// Fs represents a remote icloud drive
 type Fs struct {
 	name     string // name of this remote
 	root     string // the path we are working on.
@@ -112,6 +114,7 @@ type Fs struct {
 	pacer    *fs.Pacer // pacer for API calls
 }
 
+// Object describes an icloud drive object
 type Object struct {
 	fs          *Fs       // what this object is part of
 	remote      string    // The remote path (relative to the fs.root)
@@ -120,11 +123,12 @@ type Object struct {
 	createdTime time.Time // creation time of the object
 	id          string    // drive ID of the object
 	// docId       string    // document ID of the object
-	itemId      string // item ID of the object
+	itemID      string // item ID of the object
 	etag        string
-	downloadUrl string
+	downloadURL string
 }
 
+// Config configures the iCloud remote.
 func Config(ctx context.Context, name string, m configmap.Mapper, config fs.ConfigIn) (*fs.ConfigOut, error) {
 	appleid, _ := m.Get(configAppleID)
 	if appleid == "" {
@@ -224,6 +228,7 @@ func (f *Fs) findLeafItem(ctx context.Context, pathID string, leaf string) (item
 
 }
 
+// FindLeaf finds a directory of name leaf in the folder with ID pathID
 func (f *Fs) FindLeaf(ctx context.Context, pathID string, leaf string) (pathIDOut string, found bool, err error) {
 	item, found, err := f.findLeafItem(ctx, pathID, leaf)
 
@@ -524,49 +529,53 @@ func (f *Fs) DirCacheFlush() {
 }
 
 // SetModTime implements fs.Object.
-func (f *Fs) setModTime(ctx context.Context, itemId string, t time.Time) error {
-	service, _ := f.icloud.DriveService()
+// func (f *Fs) setModTime(ctx context.Context, itemID string, t time.Time) error {
+// 	service, _ := f.icloud.DriveService()
 
-	var doc *api.Document
-	var resp *http.Response
-	var err error
-	if err = f.pacer.Call(func() (bool, error) {
-		doc, resp, err = service.GetDocByItemID(ctx, itemId)
-		return shouldRetry(ctx, resp, err)
-	}); err != nil {
-		return err
-	}
+// 	var doc *api.Document
+// 	var resp *http.Response
+// 	var err error
+// 	if err = f.pacer.Call(func() (bool, error) {
+// 		doc, resp, err = service.GetDocByItemID(ctx, itemID)
+// 		return shouldRetry(ctx, resp, err)
+// 	}); err != nil {
+// 		return err
+// 	}
 
-	// build request
+// 	// build request
 
-	//_, _, StartingDocumentID := api.DeconstructDriveID(pathID)
-	r := api.NewUpdateFileInfo()
-	r.DocumentID = doc.DocumentID
-	//r.Path.Path = file
-	//r.Path.StartingDocumentID = dirDoc.DocumentID
-	//r.Data.Signature = doc.Data.Signature
-	//r.Data.ReferenceSignature = doc.Data.ReferenceSignature
-	//r.Data.WrappingKey = doc.Data.WrappingKey
-	//r.Data.Size = doc.Data.Size
-	r.Mtime = t.Unix() * 1000
-	//r.Btime = srcObj.modTime.Unix() * 1000
+// 	//_, _, StartingDocumentID := api.DeconstructDriveID(pathID)
+// 	r := api.NewUpdateFileInfo()
+// 	r.DocumentID = doc.DocumentID
+// 	//r.Path.Path = file
+// 	//r.Path.StartingDocumentID = dirDoc.DocumentID
+// 	//r.Data.Signature = doc.Data.Signature
+// 	//r.Data.ReferenceSignature = doc.Data.ReferenceSignature
+// 	//r.Data.WrappingKey = doc.Data.WrappingKey
+// 	//r.Data.Size = doc.Data.Size
+// 	r.Mtime = t.Unix() * 1000
+// 	//r.Btime = srcObj.modTime.Unix() * 1000
 
-	//var item *api.DriveItem
-	if err = f.pacer.Call(func() (bool, error) {
-		_, resp, err = service.UpdateFile(ctx, &r)
-		return shouldRetry(ctx, resp, err)
-	}); err != nil {
-		return err
-	}
-	return nil
-}
+// 	//var item *api.DriveItem
+// 	if err = f.pacer.Call(func() (bool, error) {
+// 		_, resp, err = service.UpdateFile(ctx, &r)
+// 		return shouldRetry(ctx, resp, err)
+// 	}); err != nil {
+// 		return err
+// 	}
+// 	return nil
+// }
 
-// DirSetModTime sets the directory modtime for dir
-//func (f *Fs) DirSetModTime(ctx context.Context, dir string, modTime time.Time) error {
-//	itemId, _, _ := f.FindDir(ctx, dir, false)
-//	return f.setModTime(ctx, itemId, modTime)
-//}
-
+// parseNormalizedID parses a normalized ID (may be in the form `driveID#itemID` or just `itemID`)
+// and returns itemID, driveID, rootURL.
+// Such a normalized ID can come from (*Item).GetID()
+//
+// Parameters:
+// - rid: the normalized ID to be parsed
+//
+// Returns:
+// - id: the itemID extracted from the normalized ID
+// - etag: the driveID extracted from the normalized ID, or an empty string if not present
 func (f *Fs) parseNormalizedID(rid string) (id string, etag string) {
 	split := strings.Split(rid, "#")
 	if len(split) == 1 {
@@ -575,7 +584,7 @@ func (f *Fs) parseNormalizedID(rid string) (id string, etag string) {
 	return split[0], split[1]
 }
 
-// wrap findpath
+// FindPath finds the leaf and directoryID from a normalized path
 func (f *Fs) FindPath(ctx context.Context, remote string, create bool) (leaf, directoryID, etag string, err error) {
 	leaf, jDirectoryID, err := f.dirCache.FindPath(ctx, remote, create)
 	if err != nil {
@@ -585,6 +594,8 @@ func (f *Fs) FindPath(ctx context.Context, remote string, create bool) (leaf, di
 	return leaf, directoryID, etag, nil
 }
 
+// FindDir finds the directory passed in returning the directory ID
+// starting from pathID
 func (f *Fs) FindDir(ctx context.Context, path string, create bool) (pathID string, etag string, err error) {
 	jDirectoryID, err := f.dirCache.FindDir(ctx, path, create)
 	if err != nil {
@@ -592,9 +603,9 @@ func (f *Fs) FindDir(ctx context.Context, path string, create bool) (pathID stri
 	}
 	directoryID, etag := f.parseNormalizedID(jDirectoryID)
 	return directoryID, etag, nil
-	// leaf, jDirectoryID, err := f.dirCache.FindPath(ctx, remote, create)
 }
 
+// IDJoin joins the given ID and ETag into a single string with a "#" delimiter.
 func (f *Fs) IDJoin(id string, etag string) string {
 	if strings.Contains(id, "#") {
 		// already contains an etag, replace
@@ -725,6 +736,7 @@ func (f *Fs) move(ctx context.Context, ID, srcDirectoryID, srcLeaf, srcEtag, dst
 	return nil, err
 }
 
+// Move moves the src object to the specified remote.
 func (f *Fs) Move(ctx context.Context, src fs.Object, remote string) (fs.Object, error) {
 	// fs.PrettyPrint("", "MOVING", fs.LogLevelDebug)
 
@@ -774,6 +786,7 @@ func (f *Fs) createObject(ctx context.Context, remote string, modTime time.Time,
 	return o, nil
 }
 
+// ReadCookies parses the raw cookie string and returns an array of http.Cookie objects.
 func ReadCookies(raw string) []*http.Cookie {
 	header := http.Header{}
 	header.Add("Cookie", raw)
@@ -903,17 +916,31 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 	return f, nil
 }
 
+// NewObject creates a new fs.Object from a given remote string.
+//
+// ctx: The context.Context for the function.
+// remote: The remote string representing the object's location.
+// Returns an fs.Object and an error.
 func (f *Fs) NewObject(ctx context.Context, remote string) (fs.Object, error) {
 	return f.NewObjectFromDriveItem(ctx, remote, nil)
 }
 
+// NewObjectFromDriveItem creates a new fs.Object from a given remote string and DriveItem.
+//
+// ctx: The context.Context for the function.
+// remote: The remote string representing the object's location.
+// item: The optional DriveItem to use for initializing the Object. If nil, the function will read the metadata from the remote location.
+// Returns an fs.Object and an error.
 func (f *Fs) NewObjectFromDriveItem(ctx context.Context, remote string, item *api.DriveItem) (fs.Object, error) {
 	o := &Object{
 		fs:     f,
 		remote: remote,
 	}
 	if item != nil {
-		o.setMetaData(item)
+		err := o.setMetaData(item)
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		// fs.PrettyPrint(item, "item", fs.LogLevelDebug)
 		item, err := f.readMetaData(ctx, remote)
@@ -963,11 +990,9 @@ func (o *Object) setMetaData(item *api.DriveItem) (err error) {
 	o.createdTime = item.DateCreated
 	// we use the item id.
 	o.id = item.Itemid
-	o.itemId = item.Itemid
-	//o.id = o.fs.IDJoin(item.Drivewsid, item.Etag)
-	//o.docId = item.Docwsid
+	o.itemID = item.Itemid
 	o.etag = item.Etag
-	o.downloadUrl = item.DownloadUrl()
+	o.downloadURL = item.DownloadURL()
 	return nil
 }
 
@@ -1010,7 +1035,7 @@ func (o *Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadClo
 		// 		return nil, err
 		// 	}
 		// }
-		resp, err = service.DownloadFile(ctx, o.downloadUrl, options)
+		resp, err = service.DownloadFile(ctx, o.downloadURL, options)
 		return shouldRetry(ctx, resp, err)
 	}); err != nil {
 		return nil, err
@@ -1035,7 +1060,7 @@ func (o *Object) Remove(ctx context.Context) error {
 	var resp *http.Response
 	var err error
 	if err = o.fs.pacer.Call(func() (bool, error) {
-		_, resp, err = service.MoveItemToTrashByItemID(ctx, o.itemId, o.etag, true)
+		_, resp, err = service.MoveItemToTrashByItemID(ctx, o.itemID, o.etag, true)
 		return shouldRetry(ctx, resp, err)
 	}); err != nil {
 		return err
@@ -1071,9 +1096,9 @@ func (o *Object) String() string {
 	return o.remote
 }
 
+// Update implements fs.Object.
 // TODO: Implement restoring the old file when an errror occures during upload
 // TODO: Implement removing old file from trash when upload is succesfull
-// Update implements fs.Object.
 func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) error {
 	size := src.Size()
 	if size < 0 {

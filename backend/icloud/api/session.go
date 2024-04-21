@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 
@@ -15,11 +13,12 @@ import (
 	"github.com/oracle/oci-go-sdk/v65/common"
 
 	//"github.com/rclone/rclone/fs"
-	config "github.com/rclone/rclone/fs/config"
+
 	"github.com/rclone/rclone/fs/fshttp"
 	"github.com/rclone/rclone/lib/rest"
 )
 
+// Session represents an iCloud session
 type Session struct {
 	SessionToken   string         `json:"session_token"`
 	Scnt           string         `json:"scnt"`
@@ -33,41 +32,13 @@ type Session struct {
 	srv *rest.Client `json:"-"`
 }
 
+// String returns the session as a string
 func (s *Session) String() string {
 	jsession, _ := json.Marshal(s)
 	return string(jsession)
 }
 
-func (s *Session) Set(b []byte) error {
-	// var session *Session
-	_ = json.Unmarshal(b, &s)
-	return nil
-	// *s = session
-}
-
-// func (s *Session) Scan(sep rune, sc fmt.ScanState, ch rune) error {
-// 	token, err := sc.Token(true, func(rune) bool { return true })
-// 	if err != nil {
-// 		return err
-// 	}
-// 	return s.Set(bytes.TrimSpace(token))
-// }
-
-func (s *Session) GetFileLocation() string {
-	return filepath.Dir(config.GetConfigPath()) + "/icloud_session.json"
-}
-
-func (s *Session) Save() error {
-	_ = os.WriteFile(s.GetFileLocation(), []byte(s.String()), 0644)
-	return nil
-}
-
-func (s *Session) Load() (*Session, error) {
-	jsession, _ := os.ReadFile(s.GetFileLocation())
-	_ = s.Set(jsession)
-	return s, nil
-}
-
+// Request makes a request
 func (s *Session) Request(ctx context.Context, opts rest.Opts, request interface{}, response interface{}) (*http.Response, error) {
 	resp, err := s.srv.CallJSON(ctx, &opts, &request, &response)
 
@@ -95,10 +66,12 @@ func (s *Session) Request(ctx context.Context, opts rest.Opts, request interface
 	return resp, nil
 }
 
+// Requires2FA returns true if the session requires 2FA
 func (s *Session) Requires2FA() bool {
 	return s.AccountInfo.DsInfo.HsaVersion == 2 && s.AccountInfo.HsaChallengeRequired
 }
 
+// SignIn signs in the session
 func (s *Session) SignIn(ctx context.Context, appleID, password string) error {
 	trustTokens := []string{}
 	if s.TrustToken != "" {
@@ -132,6 +105,7 @@ func (s *Session) SignIn(ctx context.Context, appleID, password string) error {
 
 }
 
+// AuthWithToken authenticates the session
 func (s *Session) AuthWithToken(ctx context.Context) error {
 	//fmt.Printf("%s", srv);
 
@@ -159,6 +133,7 @@ func (s *Session) AuthWithToken(ctx context.Context) error {
 	return err
 }
 
+// Validate2FACode validates the 2FA code
 func (s *Session) Validate2FACode(ctx context.Context, code string) error {
 	values := map[string]interface{}{"securityCode": map[string]string{"code": code}}
 	body, _ := IntoReader(values)
@@ -188,6 +163,7 @@ func (s *Session) Validate2FACode(ctx context.Context, code string) error {
 	return fmt.Errorf("validate2FACode failed: %w", err)
 }
 
+// TrustSession trusts the session
 func (s *Session) TrustSession(ctx context.Context) error {
 	headers := s.GetAuthHeaders(map[string]string{})
 	headers["scnt"] = s.Scnt
@@ -214,24 +190,7 @@ func (s *Session) TrustSession(ctx context.Context) error {
 	return s.AuthWithToken(ctx)
 }
 
-// func (s *Session) validateToken(ctx context.Context, srv *rest.Client) error {
-// 	fmt.Printf("Checking session token validity\n")
-// 	headers := GetCommonHeaders(map[string]string{})
-
-// 	opts := rest.Opts{
-// 		Method:       "POST",
-// 		Path:         "/validate",
-// 		ExtraHeaders: headers,
-// 		RootURL:      setupEndpoint,
-// 	}
-// 	_, err := srv.CallJSON(ctx, &opts, nil, &s.AccountInfo)
-// 	if err != nil {
-// 		return fmt.Errorf("validateToken failed: %w", err)
-// 	}
-
-// 	return nil
-// }
-
+// ValidateSession validates the session
 func (s *Session) ValidateSession(ctx context.Context) error {
 	opts := rest.Opts{
 		Method:        "POST",
@@ -248,30 +207,10 @@ func (s *Session) ValidateSession(ctx context.Context) error {
 	return nil
 }
 
-// func (s *Session) ValidateSession(ctx context.Context) error {
-// 	// headers := GetCommonHeaders(map[string]string{})
-// 	//headers["X-Apple-ID-Session-Id"] = s.SessionID
-
-// 	opts := rest.Opts{
-// 		Method:        "POST",
-// 		Path:          "/validate",
-// 		ExtraHeaders:  s.GetHeaders(map[string]string{}),
-// 		RootURL:       setupEndpoint,
-// 		ContentLength: common.Int64(0),
-// 	}
-// 	// spew.Dump(srv.Cookies())
-// 	// _, err := srv.CallJSON(ctx, &opts, nil, &s.AccountInfo)
-// 	// _, err := srv.CallJSON(ctx, &opts, nil, &s.AccountInfo)
-// 	_, err := s.Request(ctx, opts, nil, &s.AccountInfo)
-// 	// spew.Dump(resp)
-// 	if err != nil {
-// 		return fmt.Errorf("validateSession failed: %w", err)
-// 	}
-// 	// s.Cookies, _ = MergeCookies(s.Cookies, resp.Cookies())
-// 	// srv.SetCookie(s.Cookies...)
-// 	return nil
-// }
-
+// GetAuthHeaders returns the authentication headers for the session.
+//
+// It takes an `overwrite` map[string]string parameter which allows
+// overwriting the default headers. It returns a map[string]string.
 func (s *Session) GetAuthHeaders(overwrite map[string]string) map[string]string {
 	headers := map[string]string{
 		// "Accept": "*.*",
@@ -295,8 +234,8 @@ func (s *Session) GetAuthHeaders(overwrite map[string]string) map[string]string 
 	return headers
 }
 
-// GetHeaders: Gets the authentication headers required for a request
-func (s *Session) GetHeaders(overwrite map[string]string) map[string]string { //            "Accept": "*/*",
+// GetHeaders Gets the authentication headers required for a request
+func (s *Session) GetHeaders(overwrite map[string]string) map[string]string {
 	headers := GetCommonHeaders(map[string]string{})
 	headers["Cookie"] = s.GetCookieString()
 	for k, v := range overwrite {
@@ -305,16 +244,18 @@ func (s *Session) GetHeaders(overwrite map[string]string) map[string]string { //
 	return headers
 }
 
-// we only care about name and value.
-func (s *Session) GetCookieString() string { //            "Accept": "*/*",
+// GetCookieString returns the cookie header string for the session.
+func (s *Session) GetCookieString() string {
 	cookieHeader := ""
+	// we only care about name and value.
 	for _, cookie := range s.Cookies {
 		cookieHeader = cookieHeader + cookie.Name + "=" + cookie.Value + ";"
 	}
 	return cookieHeader
 }
 
-func GetCommonHeaders(overwrite map[string]string) map[string]string { //            "Accept": "*/*",
+// GetCommonHeaders generates common HTTP headers with optional overwrite.
+func GetCommonHeaders(overwrite map[string]string) map[string]string {
 	headers := map[string]string{
 		"Content-Type": "application/json",
 		"Origin":       baseEndpoint,
@@ -327,6 +268,7 @@ func GetCommonHeaders(overwrite map[string]string) map[string]string { //       
 	return headers
 }
 
+// MergeCookies merges two slices of http.Cookies, ensuring no duplicates are added.
 func MergeCookies(left []*http.Cookie, right []*http.Cookie) ([]*http.Cookie, error) {
 	var hashes []string
 	for _, cookie := range right {
@@ -340,48 +282,26 @@ func MergeCookies(left []*http.Cookie, right []*http.Cookie) ([]*http.Cookie, er
 	return right, nil
 }
 
+// GetCookiesForDomain filters the provided cookies based on the domain of the given URL.
 func GetCookiesForDomain(url *url.URL, cookies []*http.Cookie) ([]*http.Cookie, error) {
-	var domain_cookies []*http.Cookie
+	var domainCookies []*http.Cookie
 	for _, cookie := range cookies {
 		if strings.HasSuffix(url.Host, cookie.Domain) {
-			domain_cookies = append(domain_cookies, cookie)
+			domainCookies = append(domainCookies, cookie)
 		}
 	}
-	return domain_cookies, nil
+	return domainCookies, nil
 }
 
-// var contextHeader = map[string]func(d *Session, v string){
-// 	"X-Apple-ID-Account-Country": func(d *Session, v string) {
-// 		d.AccountCountry = v
-// 	},
-// 	"X-Apple-ID-Session-Id": func(d *Session, v string) {
-// 		d.SessionID = v
-// 	},
-// 	"X-Apple-Session-Token": func(d *Session, v string) {
-// 		d.SessionToken = v
-// 	},
-// 	"X-Apple-TwoSV-Trust-Token": func(d *Session, v string) {
-// 		d.TrustToken = v
-// 	},
-// 	"scnt": func(d *Session, v string) {
-// 		d.Scnt = v
-// 	},
-// }
-
+// NewSession creates a new Session instance with default values.
 func NewSession() *Session {
 	session := &Session{}
-	// if load {
-	// 	session.Load()
-	// }
-	// if session.ClientID == "" {
-	// 	session.ClientID = "auth-" + uuid.New().String()
-	// }
 	session.srv = rest.NewClient(fshttp.NewClient(context.Background())).SetRoot(baseEndpoint)
 	session.ClientID = "auth-" + uuid.New().String()
-	//session.CookieJar, _ = cookiejar.New(&cookiejar.Options{})
 	return session
 }
 
+// AccountInfo represents an account info
 type AccountInfo struct {
 	DsInfo                       *ValidateDataDsInfo    `json:"dsInfo"`
 	HasMinimumDeviceForPhotosWeb bool                   `json:"hasMinimumDeviceForPhotosWeb"`
@@ -398,10 +318,10 @@ type AccountInfo struct {
 			DownloadICloudTerms string `json:"downloadICloudTerms"`
 			RepairDone          string `json:"repairDone"`
 			AccountAuthorizeUI  string `json:"accountAuthorizeUI"`
-			VettingUrlForEmail  string `json:"vettingUrlForEmail"`
+			VettingURLForEmail  string `json:"vettingUrlForEmail"`
 			AccountCreate       string `json:"accountCreate"`
 			GetICloudTerms      string `json:"getICloudTerms"`
-			VettingUrlForPhone  string `json:"vettingUrlForPhone"`
+			VettingURLForPhone  string `json:"vettingUrlForPhone"`
 		} `json:"urls"`
 		AccountCreateEnabled bool `json:"accountCreateEnabled"`
 	} `json:"configBag"`
@@ -424,6 +344,7 @@ type AccountInfo struct {
 	Apps map[string]*ValidateDataApp `json:"apps"`
 }
 
+// ValidateDataDsInfo represents an validation info
 type ValidateDataDsInfo struct {
 	HsaVersion                         int           `json:"hsaVersion"`
 	LastName                           string        `json:"lastName"`
@@ -441,18 +362,18 @@ type ValidateDataDsInfo struct {
 	IsHideMyEmailFeatureAvailable      bool          `json:"isHideMyEmailFeatureAvailable"`
 	ContinueOnDeviceEligibleDeviceInfo []string      `json:"ContinueOnDeviceEligibleDeviceInfo"`
 	Gilligvited                        bool          `json:"gilligvited"`
-	AppleIdAliases                     []interface{} `json:"appleIdAliases"`
+	AppleIDAliases                     []interface{} `json:"appleIdAliases"`
 	UbiquityEOLEnabled                 bool          `json:"ubiquityEOLEnabled"`
 	IsPaidDeveloper                    bool          `json:"isPaidDeveloper"`
 	CountryCode                        string        `json:"countryCode"`
-	NotificationId                     string        `json:"notificationId"`
+	NotificationID                     string        `json:"notificationId"`
 	PrimaryEmailVerified               bool          `json:"primaryEmailVerified"`
 	ADsID                              string        `json:"aDsID"`
 	Locked                             bool          `json:"locked"`
 	ICDRSCapableDeviceCount            int           `json:"ICDRSCapableDeviceCount"`
 	HasICloudQualifyingDevice          bool          `json:"hasICloudQualifyingDevice"`
 	PrimaryEmail                       string        `json:"primaryEmail"`
-	AppleIdEntries                     []struct {
+	AppleIDEntries                     []struct {
 		IsPrimary bool   `json:"isPrimary"`
 		Type      string `json:"type"`
 		Value     string `json:"value"`
@@ -467,28 +388,30 @@ type ValidateDataDsInfo struct {
 		IsMppSupportedInCurrentCountry bool `json:"isMppSupportedInCurrentCountry"`
 	} `json:"mailFlags"`
 	LanguageCode         string `json:"languageCode"`
-	AppleId              string `json:"appleId"`
+	AppleID              string `json:"appleId"`
 	HasUnreleasedOS      bool   `json:"hasUnreleasedOS"`
 	AnalyticsOptInStatus bool   `json:"analyticsOptInStatus"`
 	FirstName            string `json:"firstName"`
-	ICloudAppleIdAlias   string `json:"iCloudAppleIdAlias"`
+	ICloudAppleIDAlias   string `json:"iCloudAppleIdAlias"`
 	NotesMigrated        bool   `json:"notesMigrated"`
 	BeneficiaryInfo      struct {
 		IsBeneficiary bool `json:"isBeneficiary"`
 	} `json:"beneficiaryInfo"`
 	HasPaymentInfo bool   `json:"hasPaymentInfo"`
 	PcsDelet       bool   `json:"pcsDelet"`
-	AppleIdAlias   string `json:"appleIdAlias"`
+	AppleIDAlias   string `json:"appleIdAlias"`
 	BrMigrated     bool   `json:"brMigrated"`
 	StatusCode     int    `json:"statusCode"`
 	FamilyEligible bool   `json:"familyEligible"`
 }
 
+// ValidateDataApp represents an app
 type ValidateDataApp struct {
 	CanLaunchWithOneFactor bool `json:"canLaunchWithOneFactor"`
 	IsQualifiedForBeta     bool `json:"isQualifiedForBeta"`
 }
 
+// WebService represents a web service
 type webService struct {
 	PcsRequired bool   `json:"pcsRequired"`
 	URL         string `json:"url"`

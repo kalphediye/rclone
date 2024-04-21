@@ -18,39 +18,36 @@ import (
 	"github.com/rclone/rclone/lib/rest"
 )
 
-//"context"
-//"fmt"
-
-//"github.com/rclone/rclone/fs/config/configmap"
-
 const (
 	defaultZone        = "com.apple.CloudDocs"
 	statusOk           = "OK"
 	statusEtagConflict = "ETAG_CONFLICT"
 )
 
+// DriveService represents an iCloud Drive service.
 type DriveService struct {
 	icloud       *Client
 	RootID       string
 	endpoint     string
 	docsEndpoint string
+}
 
-	// lock *sync.Mutex
-} //
-
+// NewDriveService creates a new DriveService instance.
 func NewDriveService(icloud *Client) (*DriveService, error) {
 	return &DriveService{icloud: icloud, RootID: "FOLDER::com.apple.CloudDocs::root", endpoint: icloud.Session.AccountInfo.Webservices["drivews"].URL, docsEndpoint: icloud.Session.AccountInfo.Webservices["docws"].URL}, nil
 }
 
-func (d *DriveService) GetItemByDriveID(ctx context.Context, id string, include_children bool) (*DriveItem, *http.Response, error) {
-	items, resp, err := d.GetItemsByDriveID(ctx, []string{id}, include_children)
+// GetItemByDriveID retrieves a DriveItem by its Drive ID.
+func (d *DriveService) GetItemByDriveID(ctx context.Context, id string, includeChildren bool) (*DriveItem, *http.Response, error) {
+	items, resp, err := d.GetItemsByDriveID(ctx, []string{id}, includeChildren)
 	if err != nil {
 		return nil, resp, err
 	}
 	return items[0], resp, err
 }
 
-func (d *DriveService) GetItemsByDriveID(ctx context.Context, ids []string, include_children bool) ([]*DriveItem, *http.Response, error) {
+// GetItemsByDriveID retrieves DriveItems by their Drive IDs.
+func (d *DriveService) GetItemsByDriveID(ctx context.Context, ids []string, includeChildren bool) ([]*DriveItem, *http.Response, error) {
 	_items := []map[string]any{}
 	for _, id := range ids {
 		_items = append(_items, map[string]any{
@@ -62,7 +59,7 @@ func (d *DriveService) GetItemsByDriveID(ctx context.Context, ids []string, incl
 
 	var body *bytes.Reader
 	var path string
-	if !include_children {
+	if !includeChildren {
 		values := []map[string]any{{
 			"items": _items,
 		}}
@@ -95,6 +92,7 @@ func (d *DriveService) GetItemsByDriveID(ctx context.Context, ids []string, incl
 	return items, resp, err
 }
 
+// GetDocByPath retrieves a document by its path.
 func (d *DriveService) GetDocByPath(ctx context.Context, path string) (*Document, *http.Response, error) {
 	values := url.Values{}
 	values.Set("unified_format", "false")
@@ -118,6 +116,7 @@ func (d *DriveService) GetDocByPath(ctx context.Context, path string) (*Document
 	return item[0], resp, err
 }
 
+// GetItemByPath retrieves a DriveItem by its path.
 func (d *DriveService) GetItemByPath(ctx context.Context, path string) (*DriveItem, *http.Response, error) {
 	values := url.Values{}
 	values.Set("unified_format", "true")
@@ -141,6 +140,7 @@ func (d *DriveService) GetItemByPath(ctx context.Context, path string) (*DriveIt
 	return item[0], resp, err
 }
 
+// GetDocByItemID retrieves a document by its item ID.
 func (d *DriveService) GetDocByItemID(ctx context.Context, id string) (*Document, *http.Response, error) {
 	values := url.Values{}
 	values.Set("document_id", id)
@@ -161,6 +161,7 @@ func (d *DriveService) GetDocByItemID(ctx context.Context, id string) (*Document
 	return item, resp, err
 }
 
+// GetItemRawByItemID retrieves a DriveItemRaw by its item ID.
 func (d *DriveService) GetItemRawByItemID(ctx context.Context, id string) (*DriveItemRaw, *http.Response, error) {
 	opts := rest.Opts{
 		Method:       "GET",
@@ -177,6 +178,7 @@ func (d *DriveService) GetItemRawByItemID(ctx context.Context, id string) (*Driv
 	return item, resp, err
 }
 
+// GetItemsInFolder retrieves a list of DriveItemRaw objects in a folder with the given ID.
 func (d *DriveService) GetItemsInFolder(ctx context.Context, id string, limit int64) ([]*DriveItemRaw, *http.Response, error) {
 	values := url.Values{}
 	values.Set("limit", strconv.FormatInt(limit, 10))
@@ -201,6 +203,7 @@ func (d *DriveService) GetItemsInFolder(ctx context.Context, id string, limit in
 	return items.Items, resp, err
 }
 
+// GetDownloadURL retrieves the download URL for a file in the DriveService.
 func (d *DriveService) GetDownloadURL(ctx context.Context, id string) (string, *http.Response, error) {
 	_, zone, docid := DeconstructDriveID(id)
 	values := url.Values{}
@@ -227,6 +230,7 @@ func (d *DriveService) GetDownloadURL(ctx context.Context, id string) (string, *
 	return url, resp, err
 }
 
+// DownloadFile downloads a file from the given URL using the provided options.
 func (d *DriveService) DownloadFile(ctx context.Context, url string, opt []fs.OpenOption) (*http.Response, error) {
 	opts := &rest.Opts{
 		Method:       "GET",
@@ -250,6 +254,7 @@ func (d *DriveService) DownloadFile(ctx context.Context, url string, opt []fs.Op
 	return d.icloud.srv.Call(ctx, opts)
 }
 
+// MoveItemToTrashByItemID moves an item to the trash based on the item ID.
 func (d *DriveService) MoveItemToTrashByItemID(ctx context.Context, id, etag string, force bool) (*DriveItem, *http.Response, error) {
 	doc, resp, err := d.GetDocByItemID(ctx, id)
 	if err != nil {
@@ -258,6 +263,7 @@ func (d *DriveService) MoveItemToTrashByItemID(ctx context.Context, id, etag str
 	return d.MoveItemToTrashByID(ctx, doc.DriveID(), etag, force)
 }
 
+// MoveItemToTrashByID moves an item to the trash based on the item ID.
 func (d *DriveService) MoveItemToTrashByID(ctx context.Context, drivewsid, etag string, force bool) (*DriveItem, *http.Response, error) {
 	values := map[string]any{
 		"items": []map[string]any{{
@@ -334,6 +340,7 @@ func (d *DriveService) MoveItemToTrashByID(ctx context.Context, drivewsid, etag 
 // 	return item.Items[0], resp, err
 // }
 
+// CreateNewFolderByItemID creates a new folder by item ID.
 func (d *DriveService) CreateNewFolderByItemID(ctx context.Context, id, name string) (*DriveItem, *http.Response, error) {
 	doc, resp, err := d.GetDocByItemID(ctx, id)
 	if err != nil {
@@ -342,6 +349,7 @@ func (d *DriveService) CreateNewFolderByItemID(ctx context.Context, id, name str
 	return d.CreateNewFolderByDriveID(ctx, doc.DriveID(), name)
 }
 
+// CreateNewFolderByDriveID creates a new folder by its Drive ID.
 func (d *DriveService) CreateNewFolderByDriveID(ctx context.Context, drivewsid, name string) (*DriveItem, *http.Response, error) {
 	values := map[string]any{
 		"destinationDrivewsId": drivewsid,
@@ -370,6 +378,7 @@ func (d *DriveService) CreateNewFolderByDriveID(ctx context.Context, drivewsid, 
 	return fResp.Folders[0], resp, err
 }
 
+// RenameItemByItemID renames a DriveItem by its item ID.
 func (d *DriveService) RenameItemByItemID(ctx context.Context, id, etag, name string, force bool) (*DriveItem, *http.Response, error) {
 	doc, resp, err := d.GetDocByItemID(ctx, id)
 	if err != nil {
@@ -378,6 +387,7 @@ func (d *DriveService) RenameItemByItemID(ctx context.Context, id, etag, name st
 	return d.RenameItemByDriveID(ctx, doc.DriveID(), doc.Etag, name, force)
 }
 
+// RenameItemByDriveID renames a DriveItem by its drive ID.
 func (d *DriveService) RenameItemByDriveID(ctx context.Context, id, etag, name string, force bool) (*DriveItem, *http.Response, error) {
 	// split := strings.Split(name, ".")
 	values := map[string]any{
@@ -417,6 +427,7 @@ func (d *DriveService) RenameItemByDriveID(ctx context.Context, id, etag, name s
 	return items.Items[0], resp, err
 }
 
+// MoveItemByItemID moves an item by its item ID to a destination item ID.
 func (d *DriveService) MoveItemByItemID(ctx context.Context, id, etag, dstID string, force bool) (*DriveItem, *http.Response, error) {
 	docSrc, resp, err := d.GetDocByItemID(ctx, id)
 	if err != nil {
@@ -429,6 +440,7 @@ func (d *DriveService) MoveItemByItemID(ctx context.Context, id, etag, dstID str
 	return d.MoveItemByDriveID(ctx, docSrc.DriveID(), docSrc.Etag, docDst.DriveID(), force)
 }
 
+// MoveItemByDriveID moves an item by its drive ID.
 func (d *DriveService) MoveItemByDriveID(ctx context.Context, id, etag, dstID string, force bool) (*DriveItem, *http.Response, error) {
 	values := map[string]any{
 		"destinationDrivewsId": dstID,
@@ -497,7 +509,8 @@ func (d *DriveService) MoveItemByDriveID(ctx context.Context, id, etag, dstID st
 // 	return resp, err
 // }
 
-func (d *DriveService) CopyDocByItemID(ctx context.Context, itemId string) (*DriveItemRaw, *http.Response, error) {
+// CopyDocByItemID copies a document by its item ID.
+func (d *DriveService) CopyDocByItemID(ctx context.Context, itemID string) (*DriveItemRaw, *http.Response, error) {
 	// putting name in info doesnt work. extension does work so assume this is a bug in the endpoint
 	values := map[string]any{
 		"info_to_update": map[string]any{},
@@ -507,7 +520,7 @@ func (d *DriveService) CopyDocByItemID(ctx context.Context, itemId string) (*Dri
 
 	opts := rest.Opts{
 		Method:       "POST",
-		Path:         "/v1/item/copy/" + itemId,
+		Path:         "/v1/item/copy/" + itemID,
 		ExtraHeaders: d.icloud.Session.GetHeaders(map[string]string{}),
 		RootURL:      d.docsEndpoint,
 		Body:         body,
@@ -521,6 +534,7 @@ func (d *DriveService) CopyDocByItemID(ctx context.Context, itemId string) (*Dri
 	return info, resp, err
 }
 
+// UploadFileByItemID uploads a file to the DriveService using the specified item ID as the destination folder.
 func (d *DriveService) UploadFileByItemID(ctx context.Context, in io.Reader, size int64, name, folderItemID string, mTime time.Time) (*DriveItem, *http.Response, error) {
 	doc, resp, err := d.GetDocByItemID(ctx, folderItemID)
 	if err != nil {
@@ -529,6 +543,7 @@ func (d *DriveService) UploadFileByItemID(ctx context.Context, in io.Reader, siz
 	return d.UploadFile(ctx, in, size, name, doc.DriveID(), mTime)
 }
 
+// UploadFile uploads a file to the DriveService.
 func (d *DriveService) UploadFile(ctx context.Context, in io.Reader, size int64, name, folderDriveID string, mTime time.Time) (*DriveItem, *http.Response, error) {
 	// detect MIME type by looking at the filename only
 	mimeType := mime.TypeByExtension(filepath.Ext(name))
@@ -576,7 +591,7 @@ func (d *DriveService) UploadFile(ctx context.Context, in io.Reader, size int64,
 
 	_, _, StartingDocumentID := DeconstructDriveID(folderDriveID)
 	r := NewUpdateFileInfo()
-	r.DocumentID = responseInfo[0].DocumentId
+	r.DocumentID = responseInfo[0].DocumentID
 	r.Path.Path = name
 	r.Path.StartingDocumentID = StartingDocumentID
 	r.Data.Receipt = singleFileResponse.SingleFile.Receipt
@@ -591,6 +606,11 @@ func (d *DriveService) UploadFile(ctx context.Context, in io.Reader, size int64,
 	// return d.UpdateFile(ctx, responseInfo[0].DocumentId, name, folderID, mTime, singleFileResponse.SingleFile)
 }
 
+// UpdateFile updates a file in the DriveService.
+//
+// ctx: the context.Context object for the request.
+// r: a pointer to the UpdateFileInfo struct containing the information for the file update.
+// Returns a pointer to the DriveItem struct representing the updated file, the http.Response object, and an error if any.
 func (d *DriveService) UpdateFile(ctx context.Context, r *UpdateFileInfo) (*DriveItem, *http.Response, error) {
 
 	// func (d *DriveService) UpdateFile(ctx context.Context, documentID, name, folderID string, mTime time.Time, singleFile *SingleFileInfo) (*DriveItem, *http.Response, error) {
@@ -655,12 +675,7 @@ func (d *DriveService) UpdateFile(ctx context.Context, r *UpdateFileInfo) (*Driv
 	return &item, resp, err
 }
 
-// async getNode(nodeId: {drivewsid: string} | string = "FOLDER::com.apple.CloudDocs::root") {
-// 	return new iCloudDriveNode(this,
-// 		typeof nodeId === "string" ? nodeId : nodeId.drivewsid
-// 	).refresh();
-// }
-
+// UpdateFileInfo represents the information for an update to a file in the DriveService.
 type UpdateFileInfo struct {
 	AllowConflict   bool   `json:"allow_conflict"`
 	Btime           int64  `json:"btime"`
@@ -682,12 +697,16 @@ type UpdateFileInfo struct {
 	} `json:"path"`
 }
 
+// FileFlags defines the file flags for a document.
 type FileFlags struct {
 	IsExecutable bool `json:"is_executable"`
 	IsHidden     bool `json:"is_hidden"`
 	IsWritable   bool `json:"is_writable"`
 }
 
+// NewUpdateFileInfo creates a new UpdateFileInfo object with default values.
+//
+// Returns an UpdateFileInfo object.
 func NewUpdateFileInfo() UpdateFileInfo {
 	return UpdateFileInfo{
 		Command:         "add_file",
@@ -701,16 +720,18 @@ func NewUpdateFileInfo() UpdateFileInfo {
 	}
 }
 
+// DriveItemRaw is a raw drive item.
 // not suure what to call this but there seems to be a "unified" and non "unified" drive item response. This is the non unified.
 type DriveItemRaw struct {
 	ItemID   string            `json:"item_id"`
 	ItemInfo *DriveItemRawInfo `json:"item_info"`
 }
 
-// func (d *DriveItemRaw) NameWithoutExtension() string {
-// 	return strings.TrimRight(d.ItemInfo.Name, "."+d.ItemInfo.Extension)
-// }
-
+// SplitName splits the name of a DriveItemRaw into its name and extension.
+//
+// It returns the name and extension as separate strings. If the name ends with a dot,
+// it means there is no extension, so an empty string is returned for the extension.
+// If the name does not contain a dot, it means
 func (d *DriveItemRaw) SplitName() (string, string) {
 	name := d.ItemInfo.Name
 	// ends with a dot, no extension
@@ -725,6 +746,11 @@ func (d *DriveItemRaw) SplitName() (string, string) {
 	return name[:lastInd], name[lastInd+1:]
 }
 
+// ModTime returns the modification time of the DriveItemRaw.
+//
+// It parses the ModifiedAt field of the ItemInfo struct and converts it to a time.Time value.
+// If the parsing fails, it returns the zero value of time.Time.
+// The returned time.Time value represents the modification time of the DriveItemRaw.
 func (d *DriveItemRaw) ModTime() time.Time {
 	i, err := strconv.ParseInt(d.ItemInfo.ModifiedAt, 10, 64)
 	if err != nil {
@@ -733,6 +759,11 @@ func (d *DriveItemRaw) ModTime() time.Time {
 	return time.UnixMilli(i)
 }
 
+// CreatedTime returns the creation time of the DriveItemRaw.
+//
+// It parses the CreatedAt field of the ItemInfo struct and converts it to a time.Time value.
+// If the parsing fails, it returns the zero value of time.Time.
+// The returned time.Time
 func (d *DriveItemRaw) CreatedTime() time.Time {
 	i, err := strconv.ParseInt(d.ItemInfo.CreatedAt, 10, 64)
 	if err != nil {
@@ -741,17 +772,20 @@ func (d *DriveItemRaw) CreatedTime() time.Time {
 	return time.UnixMilli(i)
 }
 
+// Size returns the size of the drive item.
+//
+// It parses the size from the ItemInfo struct and returns it as an int64.
 func (d *DriveItemRaw) Size() int64 {
 	if n, err := strconv.ParseInt(d.ItemInfo.Size, 10, 64); err == nil {
 		return n
-	} else {
-		return 0
 	}
+	return 0
 }
 
+// DriveItemRawInfo is the raw information about a drive item.
 type DriveItemRawInfo struct {
 	Name string `json:"name"`
-	// Extension is absolutly borked on endpoints so dont use it.
+	// Extension is absolutely borked on endpoints so dont use it.
 	Extension  string `json:"extension"`
 	Size       string `json:"size"`
 	Type       string `json:"type"`
@@ -763,6 +797,10 @@ type DriveItemRawInfo struct {
 	} `json:"urls"`
 }
 
+// IntoDriveItem converts a DriveItemRaw into a DriveItem.
+//
+// It takes no parameters.
+// It returns a pointer to a DriveItem.
 func (d *DriveItemRaw) IntoDriveItem() *DriveItem {
 	name, extension := d.SplitName()
 	return &DriveItem{
@@ -778,6 +816,7 @@ func (d *DriveItemRaw) IntoDriveItem() *DriveItem {
 	}
 }
 
+// DocumentUpdateResponse is the response of a document update request.
 type DocumentUpdateResponse struct {
 	Status struct {
 		StatusCode   int    `json:"status_code"`
@@ -793,6 +832,7 @@ type DocumentUpdateResponse struct {
 	} `json:"results"`
 }
 
+// Document represents a document on iCloud.
 type Document struct {
 	Status struct {
 		StatusCode   int    `json:"status_code"`
@@ -824,10 +864,18 @@ type Document struct {
 	HasChainedParent bool        `json:"hasChainedParent"`
 }
 
+// DriveID returns the drive ID of the Document.
+//
+// It concatenates the Type, defaultZone, and DocumentID fields of the Document struct to form the drive ID.
+// The drive ID is in the format "Type::defaultZone::DocumentID".
+//
+// Returns:
+// - string: The drive
 func (d *Document) DriveID() string {
 	return d.Type + "::" + defaultZone + "::" + d.DocumentID
 }
 
+// DocumentData represents the data of a document.
 type DocumentData struct {
 	Signature          string `json:"signature"`
 	Owner              string `json:"owner"`
@@ -837,10 +885,12 @@ type DocumentData struct {
 	PcsInfo            string `json:"pcsInfo"`
 }
 
+// SingleFileResponse is the response of a single file request.
 type SingleFileResponse struct {
 	SingleFile *SingleFileInfo `json:"singleFile"`
 }
 
+// SingleFileInfo represents the information of a single file.
 type SingleFileInfo struct {
 	ReferenceSignature string `json:"referenceChecksum"`
 	Size               int    `json:"size"`
@@ -849,11 +899,13 @@ type SingleFileInfo struct {
 	Receipt            string `json:"receipt"`
 }
 
+// UploadResponse is the response of an upload request.
 type UploadResponse struct {
 	URL        string `json:"url"`
-	DocumentId string `json:"document_id"`
+	DocumentID string `json:"document_id"`
 }
 
+// FileRequestToken represents the token of a file request.
 type FileRequestToken struct {
 	URL                string `json:"url"`
 	Token              string `json:"token"`
@@ -862,6 +914,7 @@ type FileRequestToken struct {
 	ReferenceSignature string `json:"reference_signature"`
 }
 
+// FileRequest represents the request of a file.
 type FileRequest struct {
 	DocumentID   string            `json:"document_id"`
 	ItemID       string            `json:"item_id"`
@@ -871,10 +924,12 @@ type FileRequest struct {
 	DoubleEtag   string            `json:"double_etag"`
 }
 
+// CreateFoldersResponse is the response of a create folders request.
 type CreateFoldersResponse struct {
 	Folders []*DriveItem `json:"folders"`
 }
 
+// DriveItem represents an item on iCloud.
 type DriveItem struct {
 	DateCreated         time.Time    `json:"dateCreated"`
 	Drivewsid           string       `json:"drivewsid"`
@@ -904,14 +959,17 @@ type DriveItem struct {
 	} `json:"urls"`
 }
 
+// IsFolder returns true if the item is a folder.
 func (d *DriveItem) IsFolder() bool {
 	return d.Type == "FOLDER" || d.Type == "APP_CONTAINER"
 }
 
-func (d *DriveItem) DownloadUrl() string {
+// DownloadURL returns the download URL of the item.
+func (d *DriveItem) DownloadURL() string {
 	return d.Urls.URLDownload
 }
 
+// FullName returns the full name of the item.
 // name + extension
 func (d *DriveItem) FullName() string {
 	if d.Extension != "" {
@@ -920,15 +978,13 @@ func (d *DriveItem) FullName() string {
 	return d.Name
 }
 
-//func GetDriveIDFromDocID(id, t string) string {
-//	return t + "::" + defaultZone + "::" + id
-//}
-
+// GetDocIDFromDriveID returns the DocumentID from the drive ID.
 func GetDocIDFromDriveID(id string) string {
 	split := strings.Split(id, "::")
 	return split[len(split)-1]
 }
 
+// DeconstructDriveID returns the document type, zone, and document ID from the drive ID.
 func DeconstructDriveID(id string) (docType, zone, docid string) {
 	split := strings.Split(id, "::")
 	return split[0], split[1], split[2]

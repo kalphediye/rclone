@@ -1,3 +1,4 @@
+// Package api provides functionality for interacting with the iCloud API.
 package api
 
 import (
@@ -16,11 +17,12 @@ const (
 	homeEndpoint  = "https://www.icloud.com"
 	setupEndpoint = "https://setup.icloud.com/setup/ws/1"
 	authEndpoint  = "https://idmsa.apple.com/appleauth/auth"
-	clientId      = "e9f98057fb916de2bbd755ef280d7257146a76e5118f27ab2e9a3d065c20c17e"
+	clientID      = "e9f98057fb916de2bbd755ef280d7257146a76e5118f27ab2e9a3d065c20c17e"
 )
 
 type sessionSave func(*Session)
 
+// Client defines the client configuration
 type Client struct {
 	appleID             string
 	password            string
@@ -31,6 +33,14 @@ type Client struct {
 	drive *DriveService
 }
 
+// New creates a new Client instance with the provided Apple ID, password, trust token, cookies, and session save callback.
+//
+// Parameters:
+// - appleID: the Apple ID of the user.
+// - password: the password of the user.
+// - trustToken: the trust token for the session.
+// - cookies: the cookies for the session.
+// - sessionSaveCallback: the callback function to save the session.
 func New(appleID, password, trustToken string, cookies []*http.Cookie, sessionSaveCallback sessionSave) (*Client, error) {
 	icloud := &Client{
 		appleID:             appleID,
@@ -45,6 +55,7 @@ func New(appleID, password, trustToken string, cookies []*http.Cookie, sessionSa
 	return icloud, nil
 }
 
+// DriveService returns the DriveService instance associated with the Client.
 func (c *Client) DriveService() (*DriveService, error) {
 	if c.drive == nil {
 		c.drive, _ = NewDriveService(c)
@@ -83,6 +94,7 @@ func (c *Client) RequestNoReAuth(ctx context.Context, opts rest.Opts, request in
 	return resp, err
 }
 
+// Authenticate authenticates the client with the iCloud API.
 func (c *Client) Authenticate(ctx context.Context) error {
 	{
 
@@ -107,14 +119,16 @@ func (c *Client) Authenticate(ctx context.Context) error {
 	}
 }
 
+// SignIn signs in the client using the provided context and credentials.
 func (c *Client) SignIn(ctx context.Context) error {
 	return c.Session.SignIn(ctx, c.appleID, c.password)
 }
 
+// IntoReader marshals the provided values into a JSON encoded reader
 func IntoReader(values any) (*bytes.Reader, error) {
 	m, err := json.Marshal(values)
-	if err == nil {
-		return bytes.NewReader(m), nil
+	if err != nil {
+		return nil, err
 	}
-	return nil, err
+	return bytes.NewReader(m), nil
 }

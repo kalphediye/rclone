@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rclone/rclone/backend/local"
 	"github.com/rclone/rclone/fs"
 	"github.com/rclone/rclone/fs/fserrors"
 	"github.com/rclone/rclone/fs/operations"
@@ -581,7 +582,7 @@ func (item *Item) _store(ctx context.Context, storeFn StoreFn) (err error) {
 	// defer log.Trace(item.name, "item=%p", item)("err=%v", &err)
 
 	// Transfer the temp file to the remote
-	cacheObj, err := item.c.fcache.NewObject(ctx, item.name)
+	cacheObj, err := item.c.fcache.NewObject(ctx, item.c.fcache.(*local.Fs).LocalToStandardPath(toOSPath(item.name)))
 	if err != nil && err != fs.ErrorObjectNotFound {
 		return fmt.Errorf("vfs cache: failed to find cache file: %w", err)
 	}

@@ -689,6 +689,11 @@ func (f *Fs) localPath(name string) string {
 	return filepath.Join(f.root, filepath.FromSlash(f.opt.Enc.FromStandardPath(name)))
 }
 
+// LocalToStandardPath coverts the file name in the local filesystem to StandardPath with the user specified encoding
+func (f *Fs) LocalToStandardPath(name string) string {
+	return f.opt.Enc.ToStandardPath(filepath.ToSlash(name))
+}
+
 // Put the Object to the local filesystem
 func (f *Fs) Put(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) (fs.Object, error) {
 	// Temporary Object under construction - info filled in by Update()

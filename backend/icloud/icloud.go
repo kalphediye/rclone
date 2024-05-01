@@ -1035,7 +1035,7 @@ func (o *Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadClo
 		// Cant get the download url on a item to work, so do it the hard way.
 		if o.docId == "" {
 			doc, resp, err = service.GetDocByItemID(ctx, o.id)
-			url, _, err = service.GetDownloadURLByDriveID(ctx, doc.DocumentID)
+			url, _, err = service.GetDownloadURLByDriveID(ctx, doc.DriveID())
 		}
 		resp, err = service.DownloadFile(ctx, url, options)
 		return shouldRetry(ctx, resp, err)

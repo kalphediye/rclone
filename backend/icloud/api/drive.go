@@ -224,9 +224,9 @@ func (d *DriveService) GetDownloadURLByDriveID(ctx context.Context, id string) (
 	var filer *FileRequest
 	resp, err := d.icloud.Request(ctx, opts, nil, &filer)
 
-  if err != nil {
-    return "", resp, err
-  }
+	if err != nil {
+		return "", resp, err
+	}
 
 	var url string
 	if filer.DataToken != nil {
@@ -250,6 +250,7 @@ func (d *DriveService) DownloadFile(ctx context.Context, url string, opt []fs.Op
 	resp, err := d.icloud.srv.Call(ctx, opts)
 	if err != nil {
 		// icloud has some weird http codes
+		// fmt.Print(err)
 		if resp.StatusCode == 330 {
 			loc, err := resp.Location()
 			if err == nil {
@@ -873,14 +874,11 @@ type Document struct {
 }
 
 // DriveID returns the drive ID of the Document.
-//
-// It concatenates the Type, defaultZone, and DocumentID fields of the Document struct to form the drive ID.
-// The drive ID is in the format "Type::defaultZone::DocumentID".
-//
-// Returns:
-// - string: The drive
 func (d *Document) DriveID() string {
-	return d.Type + "::" + defaultZone + "::" + d.DocumentID
+	if d.Zone == "" {
+		d.Zone = defaultZone
+	}
+	return d.Type + "::" + d.Zone + "::" + d.DocumentID
 }
 
 // DocumentData represents the data of a document.
@@ -999,4 +997,9 @@ func DeconstructDriveID(id string) (docType, zone, docid string) {
 		return "", "", id
 	}
 	return split[0], split[1], split[2]
+}
+
+// ConstructDriveID constructs a drive ID from the given components.
+func ConstructDriveID(id string, zone string, t string) string {
+	return strings.Join([]string{t, zone, id}, "::")
 }

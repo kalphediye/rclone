@@ -204,10 +204,14 @@ func (d *DriveService) GetItemsInFolder(ctx context.Context, id string, limit in
 }
 
 // GetDownloadURL retrieves the download URL for a file in the DriveService.
-func (d *DriveService) GetDownloadURL(ctx context.Context, id string) (string, *http.Response, error) {
+func (d *DriveService) GetDownloadURLByDriveID(ctx context.Context, id string) (string, *http.Response, error) {
 	_, zone, docid := DeconstructDriveID(id)
 	values := url.Values{}
 	values.Set("document_id", docid)
+
+	if zone == "" {
+		zone = defaultZone
+	}
 
 	opts := rest.Opts{
 		Method:       "GET",
@@ -987,5 +991,8 @@ func GetDocIDFromDriveID(id string) string {
 // DeconstructDriveID returns the document type, zone, and document ID from the drive ID.
 func DeconstructDriveID(id string) (docType, zone, docid string) {
 	split := strings.Split(id, "::")
+	if len(split) < 3 {
+		return "", "", id
+	}
 	return split[0], split[1], split[2]
 }

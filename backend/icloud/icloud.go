@@ -121,9 +121,9 @@ type Object struct {
 	size        int64     // size of the object (on server, after encryption)
 	modTime     time.Time // modification time of the object
 	createdTime time.Time // creation time of the object
-	id          string    // drive ID of the object
-	// docId       string    // document ID of the object
-	itemID      string // item ID of the object
+	id          string    // item ID of the object
+	docId       string    // document ID of the object
+	itemID      string    // item ID of the object
 	etag        string
 	downloadURL string
 }
@@ -1028,14 +1028,16 @@ func (o *Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadClo
 	service, _ := o.fs.icloud.DriveService()
 	var resp *http.Response
 	var err error
+
 	if err = o.fs.pacer.Call(func() (bool, error) {
-		// if o.downloadUrl == "" {
-		// 	o.downloadUrl, _, err = service.GetDownloadURL(ctx, o.id)
-		// 	if err != nil {
-		// 		return nil, err
-		// 	}
-		// }
-		resp, err = service.DownloadFile(ctx, o.downloadURL, options)
+		var doc *api.Document
+		var url string
+		// Cant get the download url on a item to work, so do it the hard way.
+		if o.docId == "" {
+			doc, resp, err = service.GetDocByItemID(ctx, o.id)
+			url, _, err = service.GetDownloadURLByDriveID(ctx, doc.DocumentID)
+		}
+		resp, err = service.DownloadFile(ctx, url, options)
 		return shouldRetry(ctx, resp, err)
 	}); err != nil {
 		return nil, err

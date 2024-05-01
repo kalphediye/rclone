@@ -224,6 +224,10 @@ func (d *DriveService) GetDownloadURLByDriveID(ctx context.Context, id string) (
 	var filer *FileRequest
 	resp, err := d.icloud.Request(ctx, opts, nil, &filer)
 
+  if err != nil {
+    return "", resp, err
+  }
+
 	var url string
 	if filer.DataToken != nil {
 		url = filer.DataToken.URL

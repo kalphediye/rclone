@@ -43,6 +43,7 @@ func (s *Session) Request(ctx context.Context, opts rest.Opts, request interface
 	resp, err := s.srv.CallJSON(ctx, &opts, &request, &response)
 
 	if err != nil {
+		// fmt.Print(err)
 		return resp, fmt.Errorf("%s %s failed, status %d, err: %s", opts.Method, resp.Request.URL, resp.StatusCode, err)
 	}
 
@@ -60,7 +61,6 @@ func (s *Session) Request(ctx context.Context, opts rest.Opts, request interface
 	}
 	if val := resp.Header.Get("scnt"); val != "" {
 		s.Scnt = val
-
 	}
 
 	return resp, nil

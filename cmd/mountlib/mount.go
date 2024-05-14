@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"runtime"
 	"strings"
 	"sync"
@@ -59,6 +60,7 @@ type Options struct {
 	NetworkMode        bool // Windows only
 	DirectIO           bool // use Direct IO for file access
 	CaseInsensitive    fs.Tristate
+	Remount            bool
 }
 
 // DefaultOpt is the default values for creating the mount
@@ -158,9 +160,11 @@ func AddFlags(flagSet *pflag.FlagSet) {
 	flags.BoolVarP(flagSet, &Opt.NoAppleDouble, "noappledouble", "", Opt.NoAppleDouble, "Ignore Apple Double (._) and .DS_Store files (supported on OSX only)", "Mount")
 	flags.BoolVarP(flagSet, &Opt.NoAppleXattr, "noapplexattr", "", Opt.NoAppleXattr, "Ignore all \"com.apple.*\" extended attributes (supported on OSX only)", "Mount")
 	// Windows only
-	flags.BoolVarP(flagSet, &Opt.NetworkMode, "network-mode", "", Opt.NetworkMode, "Mount as remote network drive, instead of fixed disk drive (supported on Windows only)", "Mount")
-	// Unix only
-	flags.DurationVarP(flagSet, &Opt.DaemonWait, "daemon-wait", "", Opt.DaemonWait, "Time to wait for ready mount from daemon (maximum time on Linux, constant sleep time on OSX/BSD) (not supported on Windows)", "Mount")
+	flags.BoolVarP(flagSet, &Opt.NetworkMode, "network--mode", "", Opt.NetworkMode, "Mount as remote network drive, instead of fixed disk drive (supported on Windows only)", "Mount")
+	// Linux specific
+	if runtime.GOOS == "linux" {
+		flags.BoolVarP(flagSet, &Opt.Remount, "remount", "", false, "Remount a file system")
+	}
 }
 
 const (
@@ -283,10 +287,20 @@ func NewMountCommand(commandName string, hidden bool, mount MountFn) *cobra.Comm
 
 // Mount the remote at mountpoint
 func (m *MountPoint) Mount() (mountDaemon *os.Process, err error) {
-
 	// Ensure sensible defaults
 	m.SetVolumeName(m.MountOpt.VolumeName)
 	m.SetDeviceName(m.MountOpt.DeviceName)
+
+	// Handle the --remount flag by attempting to unmount the mountpoint first
+	if runtime.GOOS == "linux" && m.MountOpt.Remount {
+		// Remount option only works on linux.
+		unmountCmd := exec.Command("fusermount", "-uz", m.MountPoint)
+		if err := unmountCmd.Run(); err != nil {
+			log.Printf("Failed to unmount existing mount point %q: %v", m.MountPoint, err)
+			return nil, err
+		}
+		log.Printf("Successfully unmounted %q for remounting", m.MountPoint)
+	}
 
 	// Start background task if --daemon is specified
 	if m.MountOpt.Daemon {
